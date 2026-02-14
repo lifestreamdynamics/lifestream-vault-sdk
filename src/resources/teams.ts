@@ -1,5 +1,6 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import type { Vault } from '../types/index.js';
 
 /** A team object returned by the API. */
 export interface Team {
@@ -430,9 +431,9 @@ export class TeamsResource {
    * });
    * ```
    */
-  async createVault(teamId: string, params: { name: string; description?: string }): Promise<Record<string, unknown>> {
+  async createVault(teamId: string, params: { name: string; description?: string }): Promise<Vault> {
     try {
-      return await this.http.post(`teams/${teamId}/vaults`, { json: params }).json<Record<string, unknown>>();
+      return await this.http.post(`teams/${teamId}/vaults`, { json: params }).json<Vault>();
     } catch (error) {
       throw await handleError(error, 'Team vault', params.name);
     }
@@ -456,9 +457,9 @@ export class TeamsResource {
    * }
    * ```
    */
-  async listVaults(teamId: string): Promise<Record<string, unknown>[]> {
+  async listVaults(teamId: string): Promise<Vault[]> {
     try {
-      const data = await this.http.get(`teams/${teamId}/vaults`).json<{ vaults: Record<string, unknown>[] }>();
+      const data = await this.http.get(`teams/${teamId}/vaults`).json<{ vaults: Vault[] }>();
       return data.vaults;
     } catch (error) {
       throw await handleError(error, 'Team', teamId);

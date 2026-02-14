@@ -110,7 +110,7 @@ export class WebhooksResource {
       const data = await this.http.get(`vaults/${vaultId}/webhooks`).json<{ webhooks: Webhook[] }>();
       return data.webhooks;
     } catch (error) {
-      throw await handleError(error, 'webhooks', vaultId);
+      throw await handleError(error, 'Webhooks', vaultId);
     }
   }
 
@@ -144,7 +144,7 @@ export class WebhooksResource {
         .post(`vaults/${vaultId}/webhooks`, { json: params })
         .json<WebhookWithSecret>();
     } catch (error) {
-      throw await handleError(error, 'webhook', params.url);
+      throw await handleError(error, 'Webhook', params.url);
     }
   }
 
@@ -176,7 +176,7 @@ export class WebhooksResource {
         .put(`vaults/${vaultId}/webhooks/${webhookId}`, { json: params })
         .json<Webhook>();
     } catch (error) {
-      throw await handleError(error, 'webhook', webhookId);
+      throw await handleError(error, 'Webhook', webhookId);
     }
   }
 
@@ -198,7 +198,7 @@ export class WebhooksResource {
     try {
       await this.http.delete(`vaults/${vaultId}/webhooks/${webhookId}`);
     } catch (error) {
-      throw await handleError(error, 'webhook', webhookId);
+      throw await handleError(error, 'Webhook', webhookId);
     }
   }
 
@@ -229,7 +229,7 @@ export class WebhooksResource {
         .json<{ deliveries: WebhookDelivery[] }>();
       return data.deliveries;
     } catch (error) {
-      throw await handleError(error, 'webhook', webhookId);
+      throw await handleError(error, 'Webhook', webhookId);
     }
   }
 }

@@ -120,7 +120,7 @@ export class HooksResource {
       const data = await this.http.get(`vaults/${vaultId}/hooks`).json<{ hooks: Hook[] }>();
       return data.hooks;
     } catch (error) {
-      throw await handleError(error, 'hooks', vaultId);
+      throw await handleError(error, 'Hooks', vaultId);
     }
   }
 
@@ -149,7 +149,7 @@ export class HooksResource {
     try {
       return await this.http.post(`vaults/${vaultId}/hooks`, { json: params }).json<Hook>();
     } catch (error) {
-      throw await handleError(error, 'hook', params.name);
+      throw await handleError(error, 'Hook', params.name);
     }
   }
 
@@ -179,7 +179,7 @@ export class HooksResource {
     try {
       return await this.http.put(`vaults/${vaultId}/hooks/${hookId}`, { json: params }).json<Hook>();
     } catch (error) {
-      throw await handleError(error, 'hook', hookId);
+      throw await handleError(error, 'Hook', hookId);
     }
   }
 
@@ -201,7 +201,7 @@ export class HooksResource {
     try {
       await this.http.delete(`vaults/${vaultId}/hooks/${hookId}`);
     } catch (error) {
-      throw await handleError(error, 'hook', hookId);
+      throw await handleError(error, 'Hook', hookId);
     }
   }
 
@@ -232,7 +232,7 @@ export class HooksResource {
         .json<{ executions: HookExecution[] }>();
       return data.executions;
     } catch (error) {
-      throw await handleError(error, 'hook', hookId);
+      throw await handleError(error, 'Hook', hookId);
     }
   }
 }

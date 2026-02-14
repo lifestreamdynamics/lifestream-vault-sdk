@@ -98,8 +98,8 @@ export class SearchResource {
       const searchParams: Record<string, string | number> = { q: params.q };
       if (params.vault) searchParams.vault = params.vault;
       if (params.tags) searchParams.tags = params.tags;
-      if (params.limit) searchParams.limit = params.limit;
-      if (params.offset) searchParams.offset = params.offset;
+      if (params.limit !== undefined) searchParams.limit = params.limit;
+      if (params.offset !== undefined) searchParams.offset = params.offset;
       return await this.http.get('search', { searchParams }).json<SearchResponse>();
     } catch (error) {
       throw await handleError(error, 'Search', params.q);
