@@ -1,7 +1,7 @@
 {
   "name": "@lifestream-vault/sdk",
-  "version": "0.0.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for Lifestream Vault API",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,13 +11,39 @@
       "import": "./dist/index.js"
     }
   },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*",
+    "!dist/**/__tests__",
+    "README.md"
+  ],
+  "keywords": [
+    "lifestream",
+    "vault",
+    "markdown",
+    "webdav",
+    "sdk",
+    "api-client",
+    "typescript"
+  ],
+  "author": "Lifestream Dynamics <eric@lifestreamdynamics.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lifestreamdynamics/lifestream-vault-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lifestreamdynamics/lifestream-vault-sdk/issues"
+  },
+  "homepage": "https://github.com/lifestreamdynamics/lifestream-vault-sdk#readme",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "ky": "^1.8.1"
