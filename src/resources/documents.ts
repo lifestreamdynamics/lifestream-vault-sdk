@@ -38,6 +38,36 @@ export interface DocumentWithContent {
   content: string;
 }
 
+/** Version metadata for a document. */
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  versionNum: number;
+  contentHash: string;
+  sizeBytes: number;
+  changeSource: 'web' | 'api' | 'webdav';
+  changedBy: string | null;
+  isPinned: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+/** Version with its content. */
+export interface DocumentVersionWithContent extends DocumentVersion {
+  content: string | null;
+}
+
+/** Diff response between two versions. */
+export interface VersionDiffResponse {
+  fromVersion: number;
+  toVersion: number;
+  changes: Array<{
+    added?: boolean;
+    removed?: boolean;
+    value: string;
+  }>;
+}
+
 /** Summary information for a document in a listing. */
 export interface DocumentListItem {
   /** File path relative to the vault root. */
@@ -314,6 +344,109 @@ export class DocumentsResource {
         result.content = decrypt(result.content, keyHex);
       }
       return result;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Lists version history for a document.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @returns Array of version metadata objects (newest first)
+   */
+  async listVersions(vaultId: string, docPath: string): Promise<DocumentVersion[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/documents/${docPath}/versions`).json<{ versions: DocumentVersion[] }>();
+      return data.versions;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Retrieves a specific version's content.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @param versionNum - The version number to retrieve
+   * @returns The version metadata and content
+   */
+  async getVersion(vaultId: string, docPath: string, versionNum: number): Promise<DocumentVersionWithContent> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/documents/${docPath}/versions/${versionNum}`).json<{ version: DocumentVersionWithContent }>();
+      return data.version;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Computes a diff between two versions of a document.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @param from - Source version number
+   * @param to - Target version number
+   * @returns The diff with line-level changes
+   */
+  async diffVersions(vaultId: string, docPath: string, from: number, to: number): Promise<VersionDiffResponse> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/${docPath}/versions/diff`, {
+        json: { from, to },
+      }).json<VersionDiffResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Restores a document to a previous version.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @param versionNum - The version number to restore
+   * @returns The updated document metadata
+   */
+  async restoreVersion(vaultId: string, docPath: string, versionNum: number): Promise<Document> {
+    try {
+      const data = await this.http.post(`vaults/${vaultId}/documents/${docPath}/versions/${versionNum}/restore`).json<{ document: Document }>();
+      return data.document;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Pins a version to prevent it from being pruned.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @param versionNum - The version number to pin
+   * @returns The updated version metadata
+   */
+  async pinVersion(vaultId: string, docPath: string, versionNum: number): Promise<DocumentVersion> {
+    try {
+      const data = await this.http.post(`vaults/${vaultId}/documents/${docPath}/versions/${versionNum}/pin`).json<{ version: DocumentVersion }>();
+      return data.version;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Unpins a version, allowing it to be pruned.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @param versionNum - The version number to unpin
+   * @returns The updated version metadata
+   */
+  async unpinVersion(vaultId: string, docPath: string, versionNum: number): Promise<DocumentVersion> {
+    try {
+      const data = await this.http.post(`vaults/${vaultId}/documents/${docPath}/versions/${versionNum}/unpin`).json<{ version: DocumentVersion }>();
+      return data.version;
     } catch (error) {
       throw await handleError(error, 'Document', docPath);
     }
