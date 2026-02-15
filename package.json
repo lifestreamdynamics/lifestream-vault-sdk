@@ -1,5 +1,5 @@
 {
-  "name": "@lifestream-vault/sdk",
+  "name": "@lifestreamdynamics/vault-sdk",
   "version": "1.0.0",
   "description": "Official TypeScript SDK for Lifestream Vault API",
   "type": "module",
