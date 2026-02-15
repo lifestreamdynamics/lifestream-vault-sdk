@@ -15,7 +15,7 @@ vi.mock('ky', () => {
   return { default: mock };
 });
 
-import { LifestreamVaultClient } from './client.js';
+import { LifestreamVaultClient, DEFAULT_API_URL } from './client.js';
 
 describe('LifestreamVaultClient', () => {
   beforeEach(() => {
@@ -55,10 +55,14 @@ describe('LifestreamVaultClient', () => {
     expect(client.baseUrl).toBe('http://localhost:4660');
   });
 
-  it('should throw if baseUrl is empty', () => {
-    expect(
-      () => new LifestreamVaultClient({ baseUrl: '', apiKey: 'lsv_k_testkey' }),
-    ).toThrow('baseUrl is required');
+  it('should use default production URL when baseUrl is not provided', () => {
+    const client = new LifestreamVaultClient({ apiKey: 'lsv_k_testkey' });
+    expect(client.baseUrl).toBe(DEFAULT_API_URL);
+  });
+
+  it('should use default production URL when baseUrl is empty string', () => {
+    const client = new LifestreamVaultClient({ baseUrl: '', apiKey: 'lsv_k_testkey' });
+    expect(client.baseUrl).toBe(DEFAULT_API_URL);
   });
 
   it('should throw if neither apiKey nor accessToken is provided', () => {

@@ -21,12 +21,15 @@ import { TokenManager, type AuthTokens, type OnTokenRefresh } from './lib/token-
 /** Header used to prevent infinite 401 retry loops. */
 const RETRY_HEADER = 'X-Retry-After-Refresh';
 
+/** Default API URL used when `baseUrl` is not provided. */
+export const DEFAULT_API_URL = 'https://vault.lifestreamdynamics.com';
+
 /**
  * Configuration options for creating a {@link LifestreamVaultClient}.
  */
 export interface ClientOptions {
-  /** Base URL of the Lifestream Vault API server (e.g., `'https://vault.example.com'`). */
-  baseUrl: string;
+  /** Base URL of the Lifestream Vault API server. Defaults to `'https://vault.lifestreamdynamics.com'`. */
+  baseUrl?: string;
   /** API key for authentication (prefix `lsv_k_`). Provide either this or `accessToken`. */
   apiKey?: string;
   /** JWT access token for authentication. Provide either this or `apiKey`. */
@@ -56,12 +59,14 @@ export interface ClientOptions {
  * {@link ApiKeysResource | apiKeys}, {@link UserResource | user},
  * {@link SubscriptionResource | subscription}, and {@link TeamsResource | teams}.
  *
+ * When `baseUrl` is omitted, it defaults to `'https://vault.lifestreamdynamics.com'`.
+ *
  * @example
  * ```typescript
- * import { LifestreamVaultClient } from '@lifestream-vault/sdk';
+ * import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
  *
+ * // Uses the default production URL
  * const client = new LifestreamVaultClient({
- *   baseUrl: 'https://vault.example.com',
  *   apiKey: 'lsv_k_your_api_key',
  * });
  *
@@ -70,7 +75,7 @@ export interface ClientOptions {
  *
  * @example
  * ```typescript
- * // Using a JWT access token instead of an API key
+ * // Using a custom base URL and JWT access token
  * const client = new LifestreamVaultClient({
  *   baseUrl: 'https://vault.example.com',
  *   accessToken: 'eyJhbGci...',
@@ -118,11 +123,11 @@ export class LifestreamVaultClient {
    * Creates a new Lifestream Vault API client.
    *
    * @param options - Client configuration options
-   * @param options.baseUrl - Base URL of the API server (trailing slashes are stripped)
+   * @param options.baseUrl - Base URL of the API server (trailing slashes are stripped). Defaults to `'https://vault.lifestreamdynamics.com'`.
    * @param options.apiKey - API key for authentication (mutually exclusive with `accessToken`)
    * @param options.accessToken - JWT access token (mutually exclusive with `apiKey`)
    * @param options.timeout - Request timeout in milliseconds (default: 30000)
-   * @throws {ValidationError} If `baseUrl` is empty or neither `apiKey` nor `accessToken` is provided
+   * @throws {ValidationError} If neither `apiKey` nor `accessToken` is provided
    *
    * @example
    * ```typescript
@@ -133,14 +138,11 @@ export class LifestreamVaultClient {
    * ```
    */
   constructor(options: ClientOptions) {
-    if (!options.baseUrl) {
-      throw new ValidationError('baseUrl is required');
-    }
     if (!options.apiKey && !options.accessToken) {
       throw new ValidationError('Either apiKey or accessToken is required');
     }
 
-    this.baseUrl = options.baseUrl.replace(/\/$/, '');
+    this.baseUrl = (options.baseUrl || DEFAULT_API_URL).replace(/\/$/, '');
 
     const prefixUrl = `${this.baseUrl}/api/v1`;
     const timeout = options.timeout || 30_000;
@@ -301,19 +303,19 @@ export class LifestreamVaultClient {
    * Authenticate with email and password to obtain JWT tokens.
    * Returns an authenticated client instance with token management.
    *
-   * @param baseUrl - Base URL of the API server
+   * @param baseUrl - Base URL of the API server. Defaults to `'https://vault.lifestreamdynamics.com'`.
    * @param email - User email address
    * @param password - User password
    * @param options - Additional client options (timeout, refreshBufferMs, onTokenRefresh, etc.)
    * @returns A new authenticated client with the access/refresh tokens used
    */
   static async login(
-    baseUrl: string,
+    baseUrl: string | undefined,
     email: string,
     password: string,
     options: Omit<ClientOptions, 'baseUrl' | 'apiKey' | 'accessToken' | 'refreshToken'> = {},
   ): Promise<{ client: LifestreamVaultClient; tokens: AuthTokens; refreshToken: string | null }> {
-    const normalizedUrl = baseUrl.replace(/\/$/, '');
+    const normalizedUrl = (baseUrl || DEFAULT_API_URL).replace(/\/$/, '');
     const http = ky.create({
       prefixUrl: `${normalizedUrl}/api/v1`,
       timeout: options.timeout || 30_000,

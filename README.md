@@ -3,7 +3,7 @@
 Official TypeScript SDK for the Lifestream Vault API. Build powerful integrations with your Lifestream Vault account using a modern, type-safe client library.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![npm version](https://img.shields.io/npm/v/@lifestream-vault/sdk.svg)](https://www.npmjs.com/package/@lifestream-vault/sdk)
+[![npm version](https://img.shields.io/npm/v/@lifestreamdynamics/vault-sdk.svg)](https://www.npmjs.com/package/@lifestreamdynamics/vault-sdk)
 
 ## 📖 Table of Contents
 
@@ -42,19 +42,19 @@ Official TypeScript SDK for the Lifestream Vault API. Build powerful integration
 ### NPM (Recommended)
 
 ```bash
-npm install @lifestream-vault/sdk
+npm install @lifestreamdynamics/vault-sdk
 ```
 
 ### Yarn
 
 ```bash
-yarn add @lifestream-vault/sdk
+yarn add @lifestreamdynamics/vault-sdk
 ```
 
 ### pnpm
 
 ```bash
-pnpm add @lifestream-vault/sdk
+pnpm add @lifestreamdynamics/vault-sdk
 ```
 
 ### CDN
@@ -62,24 +62,26 @@ pnpm add @lifestream-vault/sdk
 ```html
 <!-- ES Module -->
 <script type="module">
-  import { LifestreamVaultClient } from 'https://unpkg.com/@lifestream-vault/sdk/dist/index.js';
+  import { LifestreamVaultClient } from 'https://unpkg.com/@lifestreamdynamics/vault-sdk/dist/index.js';
 </script>
 
 <!-- Or via jsDelivr -->
 <script type="module">
-  import { LifestreamVaultClient } from 'https://cdn.jsdelivr.net/npm/@lifestream-vault/sdk/+esm';
+  import { LifestreamVaultClient } from 'https://cdn.jsdelivr.net/npm/@lifestreamdynamics/vault-sdk/+esm';
 </script>
 ```
 
 ## 🚀 Quick Start
 
+> **Self-hosting?** Replace `https://vault.lifestreamdynamics.com` with your server's URL, or set the `LSVAULT_API_URL` environment variable.
+
 ### Basic Usage with API Key
 
 ```typescript
-import { LifestreamVaultClient } from '@lifestream-vault/sdk';
+import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
 
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key_here',
 });
 
@@ -95,10 +97,10 @@ console.log(doc.content);
 ### Login with Email and Password
 
 ```typescript
-import { LifestreamVaultClient } from '@lifestream-vault/sdk';
+import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
 
 const { client, tokens } = await LifestreamVaultClient.login(
-  'https://vault.example.com',
+  'https://vault.lifestreamdynamics.com',
   'user@example.com',
   'your-password',
 );
@@ -111,7 +113,7 @@ const vaults = await client.vaults.list();
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   accessToken: 'eyJhbGci...', // Your JWT access token
   refreshToken: 'your_refresh_token', // Optional: enables auto-refresh
 });
@@ -120,7 +122,7 @@ const client = new LifestreamVaultClient({
 ### Error Handling
 
 ```typescript
-import { LifestreamVaultClient, NotFoundError, AuthenticationError } from '@lifestream-vault/sdk';
+import { LifestreamVaultClient, NotFoundError, AuthenticationError } from '@lifestreamdynamics/vault-sdk';
 
 try {
   const vault = await client.vaults.get('non-existent-id');
@@ -145,7 +147,7 @@ Best for server-side integrations, automation scripts, and long-running services
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key_here', // Starts with 'lsv_k_'
 });
 ```
@@ -169,7 +171,7 @@ Best for user-facing applications and scenarios requiring user-specific permissi
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   accessToken: 'eyJhbGci...', // Your JWT access token
   refreshToken: 'your_refresh_token', // Optional but recommended
   refreshBufferMs: 60000, // Refresh 60s before expiry (default)
@@ -189,7 +191,7 @@ const client = new LifestreamVaultClient({
 **Login Helper:**
 ```typescript
 const { client, tokens, refreshToken } = await LifestreamVaultClient.login(
-  'https://vault.example.com',
+  'https://vault.lifestreamdynamics.com',
   'user@example.com',
   'password',
   {
@@ -560,7 +562,7 @@ console.log(health.status); // 'healthy', 'degraded', or 'down'
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `baseUrl` | `string` | **required** | Base URL of your Lifestream Vault server |
+| `baseUrl` | `string` | `https://vault.lifestreamdynamics.com` | Base URL of your Lifestream Vault server (optional, defaults to production) |
 | `apiKey` | `string` | - | API key for authentication (starts with `lsv_k_`) |
 | `accessToken` | `string` | - | JWT access token for user authentication |
 | `refreshToken` | `string` | - | JWT refresh token for automatic renewal |
@@ -575,7 +577,7 @@ console.log(health.status); // 'healthy', 'degraded', or 'down'
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
   timeout: 60000, // 60 seconds
   enableRequestSigning: true,
@@ -588,7 +590,7 @@ const client = new LifestreamVaultClient({
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   accessToken: 'eyJhbGci...',
   refreshToken: 'refresh_token_here',
   refreshBufferMs: 120000, // Refresh 2 minutes before expiry
@@ -605,10 +607,10 @@ const client = new LifestreamVaultClient({
 ### Create a Vault and Upload Documents
 
 ```typescript
-import { LifestreamVaultClient } from '@lifestream-vault/sdk';
+import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
 
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
 });
 
@@ -680,12 +682,12 @@ console.log('AI:', response2.message);
 ### Automated Backup Script
 
 ```typescript
-import { LifestreamVaultClient } from '@lifestream-vault/sdk';
+import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
 import fs from 'fs/promises';
 import path from 'path';
 
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: process.env.LSVAULT_API_KEY!,
 });
 
@@ -769,7 +771,7 @@ import {
   ConflictError,      // Resource conflict (e.g., duplicate slug)
   RateLimitError,     // Rate limit exceeded
   NetworkError,       // Network or connection error
-} from '@lifestream-vault/sdk';
+} from '@lifestreamdynamics/vault-sdk';
 ```
 
 ### Handling Specific Errors
@@ -803,7 +805,7 @@ error.context    // Additional error context (resource type, ID, etc.)
 ### Retry Logic Example
 
 ```typescript
-import { RateLimitError, NetworkError } from '@lifestream-vault/sdk';
+import { RateLimitError, NetworkError } from '@lifestreamdynamics/vault-sdk';
 
 async function fetchWithRetry(operation: () => Promise<any>, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
@@ -845,7 +847,7 @@ import {
   type Team,
   type ApiKey,
   type Subscription,
-} from '@lifestream-vault/sdk';
+} from '@lifestreamdynamics/vault-sdk';
 ```
 
 ### Type Safety
@@ -868,7 +870,7 @@ doc.document.sizeBytes; // number
 ### Generic Error Handling
 
 ```typescript
-import { SDKError } from '@lifestream-vault/sdk';
+import { SDKError } from '@lifestreamdynamics/vault-sdk';
 
 try {
   await client.vaults.get('invalid-id');
@@ -888,7 +890,7 @@ Automatically enabled for API key authentication. Adds signature headers to muta
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
   enableRequestSigning: true, // Default: true for API keys
 });
@@ -897,10 +899,34 @@ const client = new LifestreamVaultClient({
 await client.documents.put('vault-id', 'doc.md', 'content');
 ```
 
+**How Request Signing Works:**
+
+The SDK automatically signs write operations (PUT, DELETE on documents) using HMAC-SHA256. The signature is computed from a canonical payload that includes:
+
+1. **HTTP Method** (uppercase, e.g., `PUT`)
+2. **Request Path** (full pathname including `/api/v1` prefix, e.g., `/api/v1/vaults/{id}/documents/path.md`)
+3. **ISO Timestamp** (must be within 5 minutes of server time)
+4. **Nonce** (16-byte hex string for replay protection)
+5. **Body Hash** (SHA-256 hash of the request body)
+
+The payload format is: `METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_HASH`
+
+The HMAC signature is computed using your full API key as the secret, and three headers are attached to the request:
+
+- `X-Signature` - The HMAC-SHA256 signature (hex-encoded)
+- `X-Signature-Timestamp` - ISO-8601 timestamp
+- `X-Signature-Nonce` - 16-byte hex nonce (unique per request)
+
+**Security Features:**
+
+- **Timestamp validation**: Requests older than 5 minutes are rejected, preventing replay attacks
+- **Nonce tracking**: Each nonce can only be used once within a 10-minute window (enforced via Redis)
+- **Constant-time comparison**: Prevents timing attacks during signature verification
+
 **Manual Signing:**
 
 ```typescript
-import { signRequest } from '@lifestream-vault/sdk';
+import { signRequest } from '@lifestreamdynamics/vault-sdk';
 
 const headers = signRequest(
   'lsv_k_your_api_key',
@@ -909,9 +935,9 @@ const headers = signRequest(
   JSON.stringify({ name: 'My Vault' }),
 );
 
-console.log(headers['X-Signature']); // HMAC signature
-console.log(headers['X-Signature-Timestamp']); // ISO timestamp
-console.log(headers['X-Signature-Nonce']); // Random nonce
+console.log(headers['x-signature']); // HMAC signature
+console.log(headers['x-signature-timestamp']); // ISO timestamp
+console.log(headers['x-signature-nonce']); // Random nonce
 ```
 
 ### Audit Logging
@@ -920,7 +946,7 @@ Enable client-side request logging for compliance and debugging.
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
   enableAuditLogging: true,
   auditLogPath: '/var/log/lsvault/audit.log',
@@ -936,7 +962,7 @@ await client.vaults.list();
 **Standalone Audit Logger:**
 
 ```typescript
-import { AuditLogger } from '@lifestream-vault/sdk';
+import { AuditLogger } from '@lifestreamdynamics/vault-sdk';
 
 const logger = new AuditLogger({ logPath: './custom-audit.log' });
 
@@ -954,7 +980,7 @@ logger.log({
 Encrypt vault content client-side before uploading (requires encryption-enabled vault).
 
 ```typescript
-import { generateVaultKey, encryptContent, decryptContent } from '@lifestream-vault/sdk';
+import { generateVaultKey, encryptContent, decryptContent } from '@lifestreamdynamics/vault-sdk';
 
 // Generate a vault encryption key (save this securely!)
 const vaultKey = generateVaultKey();
@@ -983,7 +1009,7 @@ console.log(decrypted); // Original plaintext
 ### Token Management Utilities
 
 ```typescript
-import { decodeJwtPayload, isTokenExpired } from '@lifestream-vault/sdk';
+import { decodeJwtPayload, isTokenExpired } from '@lifestreamdynamics/vault-sdk';
 
 const token = 'eyJhbGci...';
 
@@ -1003,7 +1029,7 @@ Access the underlying `ky` HTTP client for custom requests:
 
 ```typescript
 const client = new LifestreamVaultClient({
-  baseUrl: 'https://vault.example.com',
+  baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
 });
 
@@ -1012,7 +1038,7 @@ const response = await client.http.get('custom/endpoint').json();
 
 // The client is pre-configured with:
 // - Authentication headers
-// - Base URL (https://vault.example.com/api/v1)
+// - Base URL (https://vault.lifestreamdynamics.com/api/v1)
 // - Timeout settings
 // - Request signing (if enabled)
 ```
@@ -1032,8 +1058,8 @@ For complete API documentation, guides, and examples, visit:
 
 ## 🔗 Related Packages
 
-- **[@lifestream-vault/cli](https://www.npmjs.com/package/@lifestream-vault/cli)** - Command-line interface for Lifestream Vault
-- **[@lifestream-vault/shared](https://www.npmjs.com/package/@lifestream-vault/shared)** - Shared types and schemas
+- **[@lifestreamdynamics/vault-cli](https://www.npmjs.com/package/@lifestreamdynamics/vault-cli)** - Command-line interface for Lifestream Vault
+- **[@lifestreamdynamics/vault-shared](https://www.npmjs.com/package/@lifestreamdynamics/vault-shared)** - Shared types and schemas
 
 ## 🐛 Troubleshooting
 
@@ -1105,7 +1131,7 @@ Need help? We're here for you!
 - **Documentation**: [vault.lifestreamdynamics.com/docs](https://vault.lifestreamdynamics.com/docs)
 
 When reporting issues, please include:
-- SDK version (`npm list @lifestream-vault/sdk`)
+- SDK version (`npm list @lifestreamdynamics/vault-sdk`)
 - Node.js version (`node --version`)
 - Error messages and stack traces
 - Minimal reproduction code (without sensitive credentials)
