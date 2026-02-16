@@ -13,7 +13,7 @@ export interface Subscription {
   usage: {
     vaultCount: number;
     totalStorageBytes: number;
-    apiCallsToday: number;
+    apiCallsThisMonth: number;
     aiTokens: number;
     hookExecutions: number;
     webhookDeliveries: number;

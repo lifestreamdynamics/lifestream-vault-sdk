@@ -19,7 +19,7 @@ describe('SubscriptionResource', () => {
         usage: {
           vaultCount: 5,
           totalStorageBytes: 10485760,
-          apiCallsToday: 42,
+          apiCallsThisMonth: 42,
           aiTokens: 1000,
           hookExecutions: 25,
           webhookDeliveries: 10,
@@ -41,7 +41,7 @@ describe('SubscriptionResource', () => {
         usage: {
           vaultCount: 1,
           totalStorageBytes: 0,
-          apiCallsToday: 0,
+          apiCallsThisMonth: 0,
           aiTokens: 0,
           hookExecutions: 0,
           webhookDeliveries: 0,
