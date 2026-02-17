@@ -31,6 +31,8 @@ export interface SearchResponse {
   total: number;
   /** The original query string. */
   query: string;
+  /** The search mode used (text/semantic/hybrid). */
+  mode?: string;
 }
 
 /**
@@ -63,6 +65,7 @@ export class SearchResource {
    * @param params.tags - Optional comma-separated tag filter (e.g., `'work,urgent'`)
    * @param params.limit - Maximum number of results to return
    * @param params.offset - Number of results to skip (for pagination)
+   * @param params.mode - Search mode: 'text' (full-text), 'semantic' (vector), or 'hybrid' (default: 'text')
    * @returns Search response with matching documents, total count, and the original query
    * @throws {ValidationError} If the query string is empty
    * @throws {AuthenticationError} If the request is not authenticated
@@ -86,6 +89,15 @@ export class SearchResource {
    * });
    * console.log(`Showing ${results.results.length} of ${results.total}`);
    * ```
+   *
+   * @example
+   * ```typescript
+   * // Semantic search using vector similarity
+   * const results = await client.search.search({
+   *   q: 'documents about machine learning',
+   *   mode: 'semantic',
+   * });
+   * ```
    */
   async search(params: {
     q: string;
@@ -93,6 +105,7 @@ export class SearchResource {
     tags?: string;
     limit?: number;
     offset?: number;
+    mode?: 'text' | 'semantic' | 'hybrid';
   }): Promise<SearchResponse> {
     try {
       const searchParams: Record<string, string | number> = { q: params.q };
@@ -100,6 +113,7 @@ export class SearchResource {
       if (params.tags) searchParams.tags = params.tags;
       if (params.limit !== undefined) searchParams.limit = params.limit;
       if (params.offset !== undefined) searchParams.offset = params.offset;
+      if (params.mode) searchParams.mode = params.mode;
       return await this.http.get('search', { searchParams }).json<SearchResponse>();
     } catch (error) {
       throw await handleError(error, 'Search', params.q);

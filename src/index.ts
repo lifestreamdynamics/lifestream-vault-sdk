@@ -46,6 +46,16 @@ export type {
   SystemHealth,
 } from './resources/admin.js';
 export { MfaResource } from './resources/mfa.js';
+export { CalendarResource } from './resources/calendar.js';
+export type {
+  CalendarEvent,
+  DueDocument,
+  CalendarDayData,
+  CalendarActivityDay,
+  CalendarResponse,
+  CalendarActivityResponse,
+  CreateCalendarEventInput,
+} from './resources/calendar.js';
 
 // Request signing
 export {

@@ -234,6 +234,19 @@ const updated = await client.vaults.update('vault-id', {
 
 // Delete a vault
 await client.vaults.delete('vault-id');
+
+// Get the link graph for a vault
+const graph = await client.vaults.getGraph('vault-id');
+console.log(`${graph.nodes.length} documents, ${graph.edges.length} links`);
+
+// Get unresolved (broken) links
+const broken = await client.vaults.getUnresolvedLinks('vault-id');
+for (const link of broken) {
+  console.log(`Missing: ${link.targetPath}`);
+  for (const ref of link.references) {
+    console.log(`  Referenced by: ${ref.sourcePath}`);
+  }
+}
 ```
 
 ### Documents
@@ -259,6 +272,19 @@ await client.documents.delete('vault-id', 'path/to/doc.md');
 
 // Get directory tree structure
 const tree = await client.documents.tree('vault-id');
+
+// Get forward links from a document
+const links = await client.documents.getLinks('vault-id', 'notes/index.md');
+for (const link of links) {
+  console.log(`[[${link.linkText}]] -> ${link.targetPath} (resolved: ${link.isResolved})`);
+}
+
+// Get backlinks pointing to a document
+const backlinks = await client.documents.getBacklinks('vault-id', 'notes/important.md');
+console.log(`${backlinks.length} documents link to this one`);
+for (const bl of backlinks) {
+  console.log(`- ${bl.sourceDocument.path}: [[${bl.linkText}]]`);
+}
 
 // List document versions
 const versions = await client.documents.listVersions('vault-id', 'path/to/doc.md');

@@ -84,6 +84,26 @@ describe('SearchResource', () => {
       });
     });
 
+    it('should search with mode parameter', async () => {
+      mockJsonResponse(kyMock.get, { results: [], total: 0, query: 'ml', mode: 'semantic' });
+
+      await resource.search({ q: 'ml', mode: 'semantic' });
+
+      expect(kyMock.get).toHaveBeenCalledWith('search', {
+        searchParams: { q: 'ml', mode: 'semantic' },
+      });
+    });
+
+    it('should search with hybrid mode', async () => {
+      mockJsonResponse(kyMock.get, { results: [], total: 0, query: 'test', mode: 'hybrid' });
+
+      await resource.search({ q: 'test', mode: 'hybrid' });
+
+      expect(kyMock.get).toHaveBeenCalledWith('search', {
+        searchParams: { q: 'test', mode: 'hybrid' },
+      });
+    });
+
     it('should throw NetworkError on network failure', async () => {
       mockNetworkError(kyMock.get);
 

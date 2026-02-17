@@ -14,6 +14,7 @@ import { AdminResource } from './resources/admin.js';
 import { HooksResource } from './resources/hooks.js';
 import { WebhooksResource } from './resources/webhooks.js';
 import { MfaResource } from './resources/mfa.js';
+import { CalendarResource } from './resources/calendar.js';
 import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
@@ -121,6 +122,8 @@ export class LifestreamVaultClient {
   readonly webhooks: WebhooksResource;
   /** Multi-factor authentication management (TOTP, passkeys, backup codes). */
   readonly mfa: MfaResource;
+  /** Calendar, activity, and due date operations. */
+  readonly calendar: CalendarResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
 
@@ -303,6 +306,7 @@ export class LifestreamVaultClient {
     this.hooks = new HooksResource(this.http);
     this.webhooks = new WebhooksResource(this.http);
     this.mfa = new MfaResource(this.http);
+    this.calendar = new CalendarResource(this.http);
   }
 
   /**
