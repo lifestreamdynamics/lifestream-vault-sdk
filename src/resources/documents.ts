@@ -68,6 +68,24 @@ export interface VersionDiffResponse {
   }>;
 }
 
+/** Forward link from a document to another. */
+export interface ForwardLinkResult {
+  id: string;
+  targetPath: string;
+  linkText: string;
+  isResolved: boolean;
+  targetDocument: { id: string; path: string; title: string | null } | null;
+}
+
+/** Backlink pointing to a document from another. */
+export interface BacklinkResult {
+  id: string;
+  sourceDocumentId: string;
+  linkText: string;
+  contextSnippet: string | null;
+  sourceDocument: { id: string; path: string; title: string | null };
+}
+
 /** Summary information for a document in a listing. */
 export interface DocumentListItem {
   /** File path relative to the vault root. */
@@ -447,6 +465,61 @@ export class DocumentsResource {
     try {
       const data = await this.http.post(`vaults/${vaultId}/documents/${docPath}/versions/${versionNum}/unpin`).json<{ version: DocumentVersion }>();
       return data.version;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Lists forward links (outgoing wikilinks) from a document.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @returns Array of forward link objects
+   * @throws {NotFoundError} If the vault or document does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   *
+   * @example
+   * ```typescript
+   * const links = await client.documents.getLinks('vault-uuid', 'notes/index.md');
+   * for (const link of links) {
+   *   console.log(`[[${link.linkText}]] -> ${link.targetPath} (resolved: ${link.isResolved})`);
+   * }
+   * ```
+   */
+  async getLinks(vaultId: string, docPath: string): Promise<ForwardLinkResult[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/links/forward/${docPath}`).json<{ links: ForwardLinkResult[] }>();
+      return data.links;
+    } catch (error) {
+      throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Lists backlinks (incoming links) pointing to a document.
+   *
+   * @param vaultId - The vault ID containing the document
+   * @param docPath - File path relative to vault root
+   * @returns Array of backlink objects with source document info
+   * @throws {NotFoundError} If the vault or document does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   *
+   * @example
+   * ```typescript
+   * const backlinks = await client.documents.getBacklinks('vault-uuid', 'notes/important.md');
+   * console.log(`${backlinks.length} documents link to this one`);
+   * for (const bl of backlinks) {
+   *   console.log(`- ${bl.sourceDocument.path}: [[${bl.linkText}]]`);
+   * }
+   * ```
+   */
+  async getBacklinks(vaultId: string, docPath: string): Promise<BacklinkResult[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/links/backlinks/${docPath}`).json<{ backlinks: BacklinkResult[] }>();
+      return data.backlinks;
     } catch (error) {
       throw await handleError(error, 'Document', docPath);
     }

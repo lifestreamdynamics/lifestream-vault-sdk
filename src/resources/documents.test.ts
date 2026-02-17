@@ -160,4 +160,79 @@ describe('DocumentsResource', () => {
       });
     });
   });
+
+  describe('getLinks', () => {
+    it('should get forward links from a document', async () => {
+      const links = [
+        {
+          id: 'l1',
+          targetPath: 'target.md',
+          linkText: 'Target',
+          isResolved: true,
+          targetDocument: { id: 'd2', path: 'target.md', title: 'Target' },
+        },
+        {
+          id: 'l2',
+          targetPath: 'missing.md',
+          linkText: 'Missing',
+          isResolved: false,
+          targetDocument: null,
+        },
+      ];
+      mockJsonResponse(kyMock.get, { links });
+
+      const result = await resource.getLinks('v1', 'source.md');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/links/forward/source.md');
+      expect(result).toEqual(links);
+    });
+
+    it('should return empty array when no links', async () => {
+      mockJsonResponse(kyMock.get, { links: [] });
+
+      const result = await resource.getLinks('v1', 'isolated.md');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw NotFoundError on 404', async () => {
+      mockHTTPError(kyMock.get, 404, { message: 'Document not found' });
+
+      await expect(resource.getLinks('v1', 'missing.md')).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('getBacklinks', () => {
+    it('should get backlinks to a document', async () => {
+      const backlinks = [
+        {
+          id: 'bl1',
+          sourceDocumentId: 'd1',
+          linkText: 'Important',
+          contextSnippet: 'See [[Important]] for details',
+          sourceDocument: { id: 'd1', path: 'ref.md', title: 'Reference' },
+        },
+      ];
+      mockJsonResponse(kyMock.get, { backlinks });
+
+      const result = await resource.getBacklinks('v1', 'important.md');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/links/backlinks/important.md');
+      expect(result).toEqual(backlinks);
+    });
+
+    it('should return empty array when no backlinks', async () => {
+      mockJsonResponse(kyMock.get, { backlinks: [] });
+
+      const result = await resource.getBacklinks('v1', 'lonely.md');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getBacklinks('v1', 'doc.md')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
 });

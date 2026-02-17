@@ -115,4 +115,83 @@ describe('VaultsResource', () => {
       await expect(resource.delete('v1')).rejects.toBeInstanceOf(AuthorizationError);
     });
   });
+
+  describe('getGraph', () => {
+    it('should get the link graph for a vault', async () => {
+      const graph = {
+        nodes: [
+          { id: 'd1', path: 'a.md', title: 'A' },
+          { id: 'd2', path: 'b.md', title: 'B' },
+        ],
+        edges: [
+          { source: 'd1', target: 'd2', linkText: 'B' },
+        ],
+      };
+      mockJsonResponse(kyMock.get, graph);
+
+      const result = await resource.getGraph('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/links/graph');
+      expect(result).toEqual(graph);
+    });
+
+    it('should return empty graph when no documents', async () => {
+      mockJsonResponse(kyMock.get, { nodes: [], edges: [] });
+
+      const result = await resource.getGraph('v1');
+
+      expect(result.nodes).toEqual([]);
+      expect(result.edges).toEqual([]);
+    });
+
+    it('should throw NotFoundError on 404', async () => {
+      mockHTTPError(kyMock.get, 404, { message: 'Vault not found' });
+
+      await expect(resource.getGraph('nonexistent')).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('getUnresolvedLinks', () => {
+    it('should get unresolved links for a vault', async () => {
+      const unresolvedLinks = [
+        {
+          targetPath: 'missing.md',
+          references: [
+            {
+              sourceDocumentId: 'd1',
+              sourcePath: 'a.md',
+              sourceTitle: 'A',
+              linkText: 'Missing',
+            },
+            {
+              sourceDocumentId: 'd2',
+              sourcePath: 'b.md',
+              sourceTitle: null,
+              linkText: 'missing',
+            },
+          ],
+        },
+      ];
+      mockJsonResponse(kyMock.get, { unresolvedLinks });
+
+      const result = await resource.getUnresolvedLinks('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/links/unresolved');
+      expect(result).toEqual(unresolvedLinks);
+    });
+
+    it('should return empty array when no broken links', async () => {
+      mockJsonResponse(kyMock.get, { unresolvedLinks: [] });
+
+      const result = await resource.getUnresolvedLinks('v1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getUnresolvedLinks('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
 });

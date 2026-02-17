@@ -6,9 +6,16 @@ export type {
 
 export type {
   Vault,
+  LinkGraphNode,
+  LinkGraphEdge,
+  LinkGraphResponse,
+  UnresolvedLinkReference,
+  UnresolvedLink,
   Document,
   DocumentWithContent,
   DocumentListItem,
+  ForwardLinkResult,
+  BacklinkResult,
   SearchResult,
   SearchResponse,
   AiChatSession,

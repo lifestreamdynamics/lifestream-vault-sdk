@@ -19,6 +19,40 @@ export interface Vault {
   updatedAt: string;
 }
 
+/** Node in the vault link graph. */
+export interface LinkGraphNode {
+  id: string;
+  path: string;
+  title: string | null;
+}
+
+/** Edge in the vault link graph. */
+export interface LinkGraphEdge {
+  source: string;
+  target: string;
+  linkText: string;
+}
+
+/** Response for the vault link graph endpoint. */
+export interface LinkGraphResponse {
+  nodes: LinkGraphNode[];
+  edges: LinkGraphEdge[];
+}
+
+/** A reference to an unresolved (broken) link. */
+export interface UnresolvedLinkReference {
+  sourceDocumentId: string;
+  sourcePath: string;
+  sourceTitle: string | null;
+  linkText: string;
+}
+
+/** An unresolved link grouped by target path. */
+export interface UnresolvedLink {
+  targetPath: string;
+  references: UnresolvedLinkReference[];
+}
+
 /**
  * Resource for managing vaults.
  *
@@ -167,6 +201,65 @@ export class VaultsResource {
   async delete(vaultId: string): Promise<void> {
     try {
       await this.http.delete(`vaults/${vaultId}`);
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  /**
+   * Gets the link graph for a vault showing all document connections.
+   *
+   * Returns nodes (documents) and edges (wikilinks) that form the vault's
+   * bidirectional link graph. Useful for visualization and graph analysis.
+   *
+   * @param vaultId - The vault ID
+   * @returns Nodes (documents) and edges (links) forming the vault's link graph
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   *
+   * @example
+   * ```typescript
+   * const graph = await client.vaults.getGraph('vault-uuid');
+   * console.log(`${graph.nodes.length} documents, ${graph.edges.length} links`);
+   * // Render graph visualization
+   * ```
+   */
+  async getGraph(vaultId: string): Promise<LinkGraphResponse> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/links/graph`).json<LinkGraphResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  /**
+   * Lists unresolved (broken) links in a vault.
+   *
+   * Returns wikilinks that point to non-existent documents, grouped by
+   * target path. Useful for finding and fixing broken references.
+   *
+   * @param vaultId - The vault ID
+   * @returns Array of unresolved links grouped by target path
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   *
+   * @example
+   * ```typescript
+   * const broken = await client.vaults.getUnresolvedLinks('vault-uuid');
+   * for (const link of broken) {
+   *   console.log(`Missing: ${link.targetPath}`);
+   *   for (const ref of link.references) {
+   *     console.log(`  Referenced by: ${ref.sourcePath}`);
+   *   }
+   * }
+   * ```
+   */
+  async getUnresolvedLinks(vaultId: string): Promise<UnresolvedLink[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/links/unresolved`).json<{ unresolvedLinks: UnresolvedLink[] }>();
+      return data.unresolvedLinks;
     } catch (error) {
       throw await handleError(error, 'Vault', vaultId);
     }
