@@ -13,10 +13,13 @@ import { ConnectorsResource } from './resources/connectors.js';
 import { AdminResource } from './resources/admin.js';
 import { HooksResource } from './resources/hooks.js';
 import { WebhooksResource } from './resources/webhooks.js';
+import { MfaResource } from './resources/mfa.js';
 import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
 import { TokenManager, type AuthTokens, type OnTokenRefresh } from './lib/token-manager.js';
+import type { MfaMethod, MfaChallengeResponse, AuthResponse } from '@lifestreamdynamics/vault-shared';
+import { isMfaChallenge } from '@lifestreamdynamics/vault-shared';
 
 /** Header used to prevent infinite 401 retry loops. */
 const RETRY_HEADER = 'X-Retry-After-Refresh';
@@ -116,6 +119,8 @@ export class LifestreamVaultClient {
   readonly hooks: HooksResource;
   /** Vault webhook management (outbound HTTP notifications). */
   readonly webhooks: WebhooksResource;
+  /** Multi-factor authentication management (TOTP, passkeys, backup codes). */
+  readonly mfa: MfaResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
 
@@ -297,23 +302,68 @@ export class LifestreamVaultClient {
     this.admin = new AdminResource(this.http);
     this.hooks = new HooksResource(this.http);
     this.webhooks = new WebhooksResource(this.http);
+    this.mfa = new MfaResource(this.http);
   }
 
   /**
    * Authenticate with email and password to obtain JWT tokens.
    * Returns an authenticated client instance with token management.
    *
+   * If the account has MFA enabled, either provide `mfaCode` directly or use
+   * the `onMfaRequired` callback to prompt for the code interactively.
+   *
    * @param baseUrl - Base URL of the API server. Defaults to `'https://vault.lifestreamdynamics.com'`.
    * @param email - User email address
    * @param password - User password
    * @param options - Additional client options (timeout, refreshBufferMs, onTokenRefresh, etc.)
+   * @param mfaOptions - MFA handling options
+   * @param mfaOptions.mfaCode - Optional MFA code to provide upfront (TOTP or backup code)
+   * @param mfaOptions.onMfaRequired - Optional callback to handle MFA challenges interactively
    * @returns A new authenticated client with the access/refresh tokens used
+   * @throws {ValidationError} If MFA is required but no MFA options are provided
+   *
+   * @example
+   * ```typescript
+   * // Login with MFA code provided upfront
+   * const { client } = await LifestreamVaultClient.login(
+   *   undefined,
+   *   'user@example.com',
+   *   'password123',
+   *   {},
+   *   { mfaCode: '123456' }
+   * );
+   * ```
+   *
+   * @example
+   * ```typescript
+   * // Login with interactive MFA prompt
+   * const { client } = await LifestreamVaultClient.login(
+   *   undefined,
+   *   'user@example.com',
+   *   'password123',
+   *   {},
+   *   {
+   *     onMfaRequired: async (challenge) => {
+   *       console.log('MFA required. Available methods:', challenge.methods);
+   *       const code = await promptUserForCode(); // Your input function
+   *       return { method: 'totp', code };
+   *     }
+   *   }
+   * );
+   * ```
    */
   static async login(
     baseUrl: string | undefined,
     email: string,
     password: string,
     options: Omit<ClientOptions, 'baseUrl' | 'apiKey' | 'accessToken' | 'refreshToken'> = {},
+    mfaOptions?: {
+      mfaCode?: string;
+      onMfaRequired?: (challenge: {
+        methods: MfaMethod[];
+        mfaToken: string;
+      }) => Promise<{ method: 'totp' | 'backup_code'; code: string }>;
+    },
   ): Promise<{ client: LifestreamVaultClient; tokens: AuthTokens; refreshToken: string | null }> {
     const normalizedUrl = (baseUrl || DEFAULT_API_URL).replace(/\/$/, '');
     const http = ky.create({
@@ -321,14 +371,90 @@ export class LifestreamVaultClient {
       timeout: options.timeout || 30_000,
     });
 
-    const response = await http.post('auth/login', {
+    const loginResponse = await http.post('auth/login', {
       json: { email, password },
     });
 
-    const tokens: AuthTokens = await response.json();
+    const loginData: AuthResponse | MfaChallengeResponse = await loginResponse.json();
+
+    // Check if MFA is required
+    if (isMfaChallenge(loginData)) {
+      // MFA challenge received
+      const challenge = {
+        methods: loginData.mfaMethods,
+        mfaToken: loginData.mfaToken,
+      };
+
+      let mfaCode: string;
+      let mfaMethod: 'totp' | 'backup_code';
+
+      if (mfaOptions?.mfaCode) {
+        // Use provided MFA code (assume TOTP by default)
+        mfaCode = mfaOptions.mfaCode;
+        mfaMethod = 'totp';
+      } else if (mfaOptions?.onMfaRequired) {
+        // Call interactive callback
+        const result = await mfaOptions.onMfaRequired(challenge);
+        mfaCode = result.code;
+        mfaMethod = result.method;
+      } else {
+        // No MFA options provided
+        throw new ValidationError(
+          `MFA is required but no MFA code or callback provided. Available methods: ${challenge.methods.join(', ')}`,
+        );
+      }
+
+      // Submit MFA verification
+      const mfaEndpoint = mfaMethod === 'totp' ? 'auth/mfa/totp' : 'auth/mfa/backup-code';
+      const mfaResponse = await http.post(mfaEndpoint, {
+        json: { mfaToken: challenge.mfaToken, code: mfaCode },
+      });
+
+      const mfaData: AuthResponse = await mfaResponse.json();
+      const tokens: AuthTokens = {
+        accessToken: mfaData.accessToken,
+        user: {
+          id: mfaData.user.id,
+          email: mfaData.user.email,
+          name: mfaData.user.displayName,
+          role: mfaData.user.role,
+        },
+      };
+
+      // Extract refresh token from Set-Cookie header if present
+      const setCookie = mfaResponse.headers.get('set-cookie');
+      let refreshToken: string | null = null;
+      if (setCookie) {
+        const match = setCookie.match(/lsv_refresh=([^;]+)/);
+        if (match) {
+          refreshToken = match[1];
+        }
+      }
+
+      const client = new LifestreamVaultClient({
+        ...options,
+        baseUrl: normalizedUrl,
+        accessToken: tokens.accessToken,
+        refreshToken: refreshToken ?? undefined,
+      });
+
+      return { client, tokens, refreshToken };
+    }
+
+    // No MFA required, proceed with normal login
+    const authData = loginData as AuthResponse;
+    const tokens: AuthTokens = {
+      accessToken: authData.accessToken,
+      user: {
+        id: authData.user.id,
+        email: authData.user.email,
+        name: authData.user.displayName,
+        role: authData.user.role,
+      },
+    };
 
     // Extract refresh token from Set-Cookie header if present
-    const setCookie = response.headers.get('set-cookie');
+    const setCookie = loginResponse.headers.get('set-cookie');
     let refreshToken: string | null = null;
     if (setCookie) {
       const match = setCookie.match(/lsv_refresh=([^;]+)/);

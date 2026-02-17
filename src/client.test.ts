@@ -179,4 +179,175 @@ describe('LifestreamVaultClient', () => {
       }),
     );
   });
+
+  it('should have mfa resource', () => {
+    const client = new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+    });
+
+    expect(client.mfa).toBeDefined();
+    expect(client.mfa.getStatus).toBeInstanceOf(Function);
+    expect(client.mfa.setupTotp).toBeInstanceOf(Function);
+    expect(client.mfa.verifyTotp).toBeInstanceOf(Function);
+  });
+});
+
+describe('LifestreamVaultClient.login', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should login without MFA when MFA is not required', async () => {
+    const ky = await import('ky');
+    const mockPost = vi.fn();
+    const mockCreate = vi.fn().mockReturnValue({ post: mockPost });
+
+    vi.mocked(ky.default.create).mockImplementation(mockCreate as any);
+
+    const mockResponse = {
+      json: vi.fn().mockResolvedValue({
+        user: { id: 'u1', email: 'user@example.com', displayName: 'Test User' },
+        accessToken: 'jwt-access-token',
+      }),
+      headers: new Headers({ 'set-cookie': 'lsv_refresh=refresh-token; HttpOnly' }),
+    };
+
+    mockPost.mockResolvedValue(mockResponse);
+
+    const result = await LifestreamVaultClient.login(
+      'http://localhost:4660',
+      'user@example.com',
+      'password123',
+    );
+
+    expect(mockPost).toHaveBeenCalledWith('auth/login', {
+      json: { email: 'user@example.com', password: 'password123' },
+    });
+    expect(result.client).toBeInstanceOf(LifestreamVaultClient);
+    expect(result.tokens.accessToken).toBe('jwt-access-token');
+    expect(result.refreshToken).toBe('refresh-token');
+  });
+
+  it('should login with MFA when mfaCode is provided', async () => {
+    const ky = await import('ky');
+    const mockPost = vi.fn();
+    const mockCreate = vi.fn().mockReturnValue({ post: mockPost });
+
+    vi.mocked(ky.default.create).mockImplementation(mockCreate as any);
+
+    // First call: login returns MFA challenge
+    const mfaChallengeResponse = {
+      json: vi.fn().mockResolvedValue({
+        mfaRequired: true,
+        mfaToken: 'mfa-token-123',
+        mfaMethods: ['totp', 'backup_code'],
+        user: { email: 'user@example.com', displayName: 'Test User' },
+      }),
+      headers: new Headers(),
+    };
+
+    // Second call: MFA verification returns tokens
+    const mfaSuccessResponse = {
+      json: vi.fn().mockResolvedValue({
+        user: { id: 'u1', email: 'user@example.com', displayName: 'Test User' },
+        accessToken: 'jwt-access-token-after-mfa',
+      }),
+      headers: new Headers({ 'set-cookie': 'lsv_refresh=refresh-token-mfa; HttpOnly' }),
+    };
+
+    mockPost.mockResolvedValueOnce(mfaChallengeResponse).mockResolvedValueOnce(mfaSuccessResponse);
+
+    const result = await LifestreamVaultClient.login(
+      'http://localhost:4660',
+      'user@example.com',
+      'password123',
+      {},
+      { mfaCode: '123456' },
+    );
+
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(mockPost).toHaveBeenNthCalledWith(1, 'auth/login', {
+      json: { email: 'user@example.com', password: 'password123' },
+    });
+    expect(mockPost).toHaveBeenNthCalledWith(2, 'auth/mfa/totp', {
+      json: { mfaToken: 'mfa-token-123', code: '123456' },
+    });
+    expect(result.client).toBeInstanceOf(LifestreamVaultClient);
+    expect(result.tokens.accessToken).toBe('jwt-access-token-after-mfa');
+    expect(result.refreshToken).toBe('refresh-token-mfa');
+  });
+
+  it('should login with MFA using onMfaRequired callback', async () => {
+    const ky = await import('ky');
+    const mockPost = vi.fn();
+    const mockCreate = vi.fn().mockReturnValue({ post: mockPost });
+
+    vi.mocked(ky.default.create).mockImplementation(mockCreate as any);
+
+    const mfaChallengeResponse = {
+      json: vi.fn().mockResolvedValue({
+        mfaRequired: true,
+        mfaToken: 'mfa-token-456',
+        mfaMethods: ['totp', 'backup_code'],
+        user: { email: 'user@example.com', displayName: 'Test User' },
+      }),
+      headers: new Headers(),
+    };
+
+    const mfaSuccessResponse = {
+      json: vi.fn().mockResolvedValue({
+        user: { id: 'u1', email: 'user@example.com', displayName: 'Test User' },
+        accessToken: 'jwt-access-token-callback',
+      }),
+      headers: new Headers({ 'set-cookie': 'lsv_refresh=refresh-token-callback; HttpOnly' }),
+    };
+
+    mockPost.mockResolvedValueOnce(mfaChallengeResponse).mockResolvedValueOnce(mfaSuccessResponse);
+
+    const onMfaRequiredMock = vi.fn().mockResolvedValue({ method: 'backup_code', code: 'AAAA-BBBB-CCCC-DDDD' });
+
+    const result = await LifestreamVaultClient.login(
+      'http://localhost:4660',
+      'user@example.com',
+      'password123',
+      {},
+      { onMfaRequired: onMfaRequiredMock },
+    );
+
+    expect(onMfaRequiredMock).toHaveBeenCalledWith({
+      methods: ['totp', 'backup_code'],
+      mfaToken: 'mfa-token-456',
+    });
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    expect(mockPost).toHaveBeenNthCalledWith(2, 'auth/mfa/backup-code', {
+      json: { mfaToken: 'mfa-token-456', code: 'AAAA-BBBB-CCCC-DDDD' },
+    });
+    expect(result.client).toBeInstanceOf(LifestreamVaultClient);
+    expect(result.tokens.accessToken).toBe('jwt-access-token-callback');
+  });
+
+  it('should throw ValidationError when MFA required but no options provided', async () => {
+    const ky = await import('ky');
+    const mockPost = vi.fn();
+    const mockCreate = vi.fn().mockReturnValue({ post: mockPost });
+
+    vi.mocked(ky.default.create).mockImplementation(mockCreate as any);
+
+    const mfaChallengeResponse = {
+      json: vi.fn().mockResolvedValue({
+        mfaRequired: true,
+        mfaToken: 'mfa-token-789',
+        mfaMethods: ['totp'],
+        user: { email: 'user@example.com', displayName: 'Test User' },
+      }),
+      headers: new Headers(),
+    };
+
+    mockPost.mockResolvedValue(mfaChallengeResponse);
+
+    await expect(
+      LifestreamVaultClient.login('http://localhost:4660', 'user@example.com', 'password123'),
+    ).rejects.toThrow(/MFA is required but no MFA code or callback provided/);
+  });
 });

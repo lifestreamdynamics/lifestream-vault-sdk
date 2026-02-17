@@ -45,6 +45,7 @@ export type {
   SubscriptionSummary,
   SystemHealth,
 } from './resources/admin.js';
+export { MfaResource } from './resources/mfa.js';
 
 // Request signing
 export {
