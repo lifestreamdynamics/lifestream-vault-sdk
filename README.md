@@ -582,6 +582,61 @@ const health = await client.admin.getHealth();
 console.log(health.status); // 'healthy', 'degraded', or 'down'
 ```
 
+### Calendar
+
+```typescript
+// Get aggregated calendar view (free tier)
+const calendar = await client.calendar.getCalendar(vaultId, { month: 2, year: 2026 });
+
+// Get activity heatmap for past year (free tier)
+const activity = await client.calendar.getActivity(vaultId);
+
+// Get documents by due date (pro tier)
+const due = await client.calendar.getDue(vaultId, { from: '2026-02-01', to: '2026-02-28' });
+
+// Get agenda view (pro tier)
+const agenda = await client.calendar.getAgenda(vaultId, { groupBy: 'week' });
+
+// Create a calendar event (pro tier)
+const event = await client.calendar.createEvent(vaultId, {
+  title: 'Team Review',
+  startAt: '2026-02-20T10:00:00Z',
+  endAt: '2026-02-20T11:00:00Z',
+});
+
+// List calendar events (pro tier)
+const events = await client.calendar.listEvents(vaultId);
+
+// Update event (pro tier)
+await client.calendar.updateEvent(vaultId, eventId, { title: 'Updated Review' });
+
+// Delete event (pro tier)
+await client.calendar.deleteEvent(vaultId, eventId);
+```
+
+### MFA
+
+```typescript
+// Get MFA status
+const status = await client.mfa.getStatus();
+
+// Set up TOTP (returns QR code URI)
+const setup = await client.mfa.setupTotp();
+
+// Verify and enable TOTP
+await client.mfa.verifyTotp({ token: '123456' });
+
+// Register a passkey
+const registration = await client.mfa.startPasskeyRegistration();
+await client.mfa.finishPasskeyRegistration(registration.options);
+
+// List passkeys
+const passkeys = await client.mfa.listPasskeys();
+
+// Regenerate backup codes
+const codes = await client.mfa.regenerateBackupCodes();
+```
+
 ## ⚙️ Configuration
 
 ### ClientOptions
