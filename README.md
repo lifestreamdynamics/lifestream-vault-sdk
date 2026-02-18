@@ -1140,7 +1140,6 @@ For complete API documentation, guides, and examples, visit:
 ## 🔗 Related Packages
 
 - **[@lifestreamdynamics/vault-cli](https://www.npmjs.com/package/@lifestreamdynamics/vault-cli)** - Command-line interface for Lifestream Vault
-- **[@lifestreamdynamics/vault-shared](https://www.npmjs.com/package/@lifestreamdynamics/vault-shared)** - Shared types and schemas
 
 ## 🐛 Troubleshooting
 

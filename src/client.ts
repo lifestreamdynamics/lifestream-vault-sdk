@@ -19,8 +19,8 @@ import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
 import { TokenManager, type AuthTokens, type OnTokenRefresh } from './lib/token-manager.js';
-import type { MfaMethod, MfaChallengeResponse, AuthResponse } from '@lifestreamdynamics/vault-shared';
-import { isMfaChallenge } from '@lifestreamdynamics/vault-shared';
+import type { MfaMethod, MfaChallengeResponse, AuthResponse } from './types/api.js';
+import { isMfaChallenge } from './types/api.js';
 
 /** Header used to prevent infinite 401 retry loops. */
 const RETRY_HEADER = 'X-Retry-After-Refresh';

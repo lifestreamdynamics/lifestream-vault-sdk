@@ -1,5 +1,5 @@
 import type { KyInstance } from 'ky';
-import type { MfaStatus, TotpSetupResponse, PasskeyInfo } from '@lifestreamdynamics/vault-shared';
+import type { MfaStatus, TotpSetupResponse, PasskeyInfo } from '../types/api.js';
 import { handleError } from '../handle-error.js';
 
 /**
