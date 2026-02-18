@@ -1,12 +1,14 @@
 export { LifestreamVaultClient, DEFAULT_API_URL, type ClientOptions } from './client.js';
 export { VaultsResource } from './resources/vaults.js';
+export type { VaultTreeNode, VaultExportRecord, VaultMfaConfig } from './resources/vaults.js';
 export { DocumentsResource } from './resources/documents.js';
+export type { BulkOperationResult } from './resources/documents.js';
 export { SearchResource } from './resources/search.js';
 export { AiResource } from './resources/ai.js';
 export { ApiKeysResource } from './resources/api-keys.js';
 export type { ApiKey, ApiKeyWithSecret, CreateApiKeyParams, UpdateApiKeyParams } from './resources/api-keys.js';
 export { UserResource } from './resources/user.js';
-export type { User, VaultStorage, StorageUsage } from './resources/user.js';
+export type { User, VaultStorage, StorageUsage, AccountSession, DataExportRecord, ConsentRecord, TeamInvitationInboxItem } from './resources/user.js';
 export { SubscriptionResource } from './resources/subscription.js';
 export type { Subscription, Plan, CheckoutSession, PortalSession, Invoice } from './resources/subscription.js';
 export { TeamsResource } from './resources/teams.js';
@@ -14,7 +16,7 @@ export type { Team, TeamMember, TeamInvitation, CreateTeamParams, UpdateTeamPara
 export { SharesResource } from './resources/shares.js';
 export type { ShareLink, CreateShareLinkParams, CreateShareLinkResponse } from './resources/shares.js';
 export { PublishResource } from './resources/publish.js';
-export type { PublishedDocument, PublishedDocumentWithMeta, PublishDocumentParams, UpdatePublishParams } from './resources/publish.js';
+export type { PublishedDocument, PublishedDocumentWithMeta, PublishDocumentParams, UpdatePublishParams, PublishSubdomain } from './resources/publish.js';
 export { ConnectorsResource } from './resources/connectors.js';
 export type {
   Connector,
@@ -44,6 +46,7 @@ export type {
   ActivityEntry,
   SubscriptionSummary,
   SystemHealth,
+  BackupStatus,
 } from './resources/admin.js';
 export { MfaResource } from './resources/mfa.js';
 export { CalendarResource } from './resources/calendar.js';
@@ -55,7 +58,15 @@ export type {
   CalendarResponse,
   CalendarActivityResponse,
   CreateCalendarEventInput,
+  AgendaGroup,
+  AgendaResponse,
 } from './resources/calendar.js';
+export { CustomDomainsResource } from './resources/custom-domains.js';
+export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';
+export { AnalyticsResource } from './resources/analytics.js';
+export type { PublishedSummary, ShareAnalytics, PublishedDocAnalytics } from './resources/analytics.js';
+export { PublishVaultResource } from './resources/publish-vault.js';
+export type { PublishedVault, PublishVaultParams } from './resources/publish-vault.js';
 
 // Request signing
 export {

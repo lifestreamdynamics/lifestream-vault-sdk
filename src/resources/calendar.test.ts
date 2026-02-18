@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CalendarResource } from './calendar.js';
 import { createKyMock, mockJsonResponse, mockNetworkError, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError } from '../errors.js';
@@ -211,6 +211,93 @@ describe('CalendarResource', () => {
       expect(kyMock.patch).toHaveBeenCalledWith('vaults/vault-1/documents/tasks/todo.md/due', {
         json: dueData,
       });
+    });
+  });
+
+  describe('getIcalFeed', () => {
+    it('should get the iCal feed as a string', async () => {
+      const icalContent = 'BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR';
+      kyMock.get.mockReturnValue({
+        json: vi.fn().mockResolvedValue(undefined),
+        text: vi.fn().mockResolvedValue(icalContent),
+        ok: true,
+        status: 200,
+      });
+
+      const result = await resource.getIcalFeed('vault-1');
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'vaults/vault-1/calendar/feed.ics',
+        expect.objectContaining({ searchParams: undefined }),
+      );
+      expect(result).toBe(icalContent);
+    });
+
+    it('should pass include filter when provided', async () => {
+      const icalContent = 'BEGIN:VCALENDAR\nEND:VCALENDAR';
+      kyMock.get.mockReturnValue({
+        json: vi.fn().mockResolvedValue(undefined),
+        text: vi.fn().mockResolvedValue(icalContent),
+        ok: true,
+        status: 200,
+      });
+
+      await resource.getIcalFeed('vault-1', { include: 'events,due' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'vaults/vault-1/calendar/feed.ics',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getIcalFeed('vault-1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('getAgenda', () => {
+    it('should get the agenda for a vault', async () => {
+      const mockResponse = {
+        groups: [
+          { label: 'Today', items: [{ documentId: 'd1', path: 'task.md', dueAt: '2024-01-15', completed: false, overdue: false }] },
+          { label: 'Overdue', items: [] },
+        ],
+        total: 1,
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getAgenda('vault-1');
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'vaults/vault-1/calendar/agenda',
+        expect.objectContaining({ searchParams: undefined }),
+      );
+      expect(result.total).toBe(1);
+      expect(result.groups).toHaveLength(2);
+    });
+
+    it('should pass filter params when provided', async () => {
+      const mockResponse = { groups: [], total: 0 };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      await resource.getAgenda('vault-1', { status: 'overdue', range: '7d', groupBy: 'priority' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'vaults/vault-1/calendar/agenda',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+    });
+
+    it('should return empty groups when no agenda items', async () => {
+      const mockResponse = { groups: [], total: 0 };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getAgenda('vault-1');
+
+      expect(result.total).toBe(0);
+      expect(result.groups).toEqual([]);
     });
   });
 

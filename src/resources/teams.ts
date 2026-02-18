@@ -1,6 +1,7 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
 import type { Vault } from '../types/index.js';
+import type { CalendarResponse, CalendarActivityResponse, CalendarEvent } from './calendar.js';
 
 /** A team object returned by the API. */
 export interface Team {
@@ -461,6 +462,34 @@ export class TeamsResource {
     try {
       const data = await this.http.get(`teams/${teamId}/vaults`).json<{ vaults: Vault[] }>();
       return data.vaults;
+    } catch (error) {
+      throw await handleError(error, 'Team', teamId);
+    }
+  }
+
+  async getCalendar(teamId: string, params: { start: string; end: string; types?: string }): Promise<CalendarResponse> {
+    try {
+      const searchParams = new URLSearchParams(params as Record<string, string>);
+      return await this.http.get(`teams/${teamId}/calendar`, { searchParams }).json<CalendarResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Team', teamId);
+    }
+  }
+
+  async getCalendarActivity(teamId: string, params: { start: string; end: string }): Promise<CalendarActivityResponse> {
+    try {
+      const searchParams = new URLSearchParams(params as Record<string, string>);
+      return await this.http.get(`teams/${teamId}/calendar/activity`, { searchParams }).json<CalendarActivityResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Team', teamId);
+    }
+  }
+
+  async getCalendarEvents(teamId: string, params?: { start?: string; end?: string }): Promise<CalendarEvent[]> {
+    try {
+      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      const data = await this.http.get(`teams/${teamId}/calendar/events`, { searchParams }).json<{ events: CalendarEvent[] }>();
+      return data.events;
     } catch (error) {
       throw await handleError(error, 'Team', teamId);
     }

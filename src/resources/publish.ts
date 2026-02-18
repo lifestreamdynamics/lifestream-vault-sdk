@@ -59,6 +59,10 @@ export interface UpdatePublishParams {
   ogImage?: string | null;
 }
 
+export interface PublishSubdomain {
+  subdomain: string | null;
+}
+
 /**
  * Resource for managing document publishing.
  *
@@ -209,6 +213,30 @@ export class PublishResource {
       await this.http.delete(`vaults/${vaultId}/publish/document/${documentPath}`);
     } catch (error) {
       throw await handleError(error, 'Published Document', documentPath);
+    }
+  }
+
+  async getSubdomain(vaultId: string): Promise<PublishSubdomain> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/publish/subdomain`).json<PublishSubdomain>();
+    } catch (error) {
+      throw await handleError(error, 'Publish', vaultId);
+    }
+  }
+
+  async setSubdomain(vaultId: string, subdomain: string): Promise<PublishSubdomain> {
+    try {
+      return await this.http.put(`vaults/${vaultId}/publish/subdomain`, { json: { subdomain } }).json<PublishSubdomain>();
+    } catch (error) {
+      throw await handleError(error, 'Publish', vaultId);
+    }
+  }
+
+  async deleteSubdomain(vaultId: string): Promise<{ message: string }> {
+    try {
+      return await this.http.delete(`vaults/${vaultId}/publish/subdomain`).json<{ message: string }>();
+    } catch (error) {
+      throw await handleError(error, 'Publish', vaultId);
     }
   }
 }

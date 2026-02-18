@@ -455,4 +455,44 @@ describe('AdminResource', () => {
       await expect(resource.getHealth()).rejects.toBeInstanceOf(NetworkError);
     });
   });
+
+  describe('getBackupStatus', () => {
+    it('should return backup status when last backup exists', async () => {
+      const mockStatus = {
+        lastBackupAt: '2024-06-01T02:00:00Z',
+        status: 'success',
+        details: { size: 1073741824, duration: 120 },
+      };
+      mockJsonResponse(kyMock.get, mockStatus);
+
+      const result = await resource.getBackupStatus();
+
+      expect(kyMock.get).toHaveBeenCalledWith('admin/backups/status');
+      expect(result.status).toBe('success');
+      expect(result.lastBackupAt).toBe('2024-06-01T02:00:00Z');
+      expect(result.details).toEqual({ size: 1073741824, duration: 120 });
+    });
+
+    it('should handle status with no previous backups', async () => {
+      const mockStatus = { lastBackupAt: null, status: 'never_run' };
+      mockJsonResponse(kyMock.get, mockStatus);
+
+      const result = await resource.getBackupStatus();
+
+      expect(result.lastBackupAt).toBeNull();
+      expect(result.status).toBe('never_run');
+    });
+
+    it('should throw AuthorizationError on 403', async () => {
+      mockHTTPError(kyMock.get, 403, { message: 'Admin access required' });
+
+      await expect(resource.getBackupStatus()).rejects.toBeInstanceOf(AuthorizationError);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getBackupStatus()).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
 });

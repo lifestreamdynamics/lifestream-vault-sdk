@@ -55,6 +55,16 @@ export interface CalendarActivityResponse {
   end: string;
 }
 
+export interface AgendaGroup {
+  label: string;
+  items: DueDocument[];
+}
+
+export interface AgendaResponse {
+  groups: AgendaGroup[];
+  total: number;
+}
+
 export interface CreateCalendarEventInput {
   title: string;
   description?: string;
@@ -259,6 +269,24 @@ export class CalendarResource {
       return await this.http.patch(`vaults/${vaultId}/documents/${path}/due`, { json: data }).json();
     } catch (error) {
       throw await handleError(error, 'Set Due Date', path);
+    }
+  }
+
+  async getIcalFeed(vaultId: string, params?: { include?: string }): Promise<string> {
+    try {
+      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      return await this.http.get(`vaults/${vaultId}/calendar/feed.ics`, { searchParams }).text();
+    } catch (error) {
+      throw await handleError(error, 'Calendar', vaultId);
+    }
+  }
+
+  async getAgenda(vaultId: string, params?: { status?: string; range?: string; groupBy?: string }): Promise<AgendaResponse> {
+    try {
+      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      return await this.http.get(`vaults/${vaultId}/calendar/agenda`, { searchParams }).json<AgendaResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Calendar', vaultId);
     }
   }
 }

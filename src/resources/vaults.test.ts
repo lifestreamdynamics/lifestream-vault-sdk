@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { VaultsResource } from './vaults.js';
 import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError, NotFoundError, AuthorizationError } from '../errors.js';
@@ -82,23 +82,23 @@ describe('VaultsResource', () => {
   });
 
   describe('update', () => {
-    it('should update vault name', async () => {
+    it('should update vault name using patch', async () => {
       const mockVault = { id: 'v1', name: 'Updated', slug: 'updated', description: null, createdAt: '2024-01-01', updatedAt: '2024-01-02' };
-      mockJsonResponse(kyMock.put, mockVault);
+      mockJsonResponse(kyMock.patch, mockVault);
 
       const result = await resource.update('v1', { name: 'Updated' });
 
-      expect(kyMock.put).toHaveBeenCalledWith('vaults/v1', { json: { name: 'Updated' } });
+      expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1', { json: { name: 'Updated' } });
       expect(result).toEqual(mockVault);
     });
 
     it('should update vault description to null', async () => {
       const mockVault = { id: 'v1', name: 'Test', slug: 'test', description: null, createdAt: '2024-01-01', updatedAt: '2024-01-02' };
-      mockJsonResponse(kyMock.put, mockVault);
+      mockJsonResponse(kyMock.patch, mockVault);
 
       await resource.update('v1', { description: null });
 
-      expect(kyMock.put).toHaveBeenCalledWith('vaults/v1', { json: { description: null } });
+      expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1', { json: { description: null } });
     });
   });
 
@@ -192,6 +192,179 @@ describe('VaultsResource', () => {
       mockNetworkError(kyMock.get);
 
       await expect(resource.getUnresolvedLinks('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('getTree', () => {
+    it('should get the file tree for a vault', async () => {
+      const tree = [{ name: 'test.md', path: 'test.md', type: 'file' as const }];
+      mockJsonResponse(kyMock.get, { tree });
+
+      const result = await resource.getTree('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/tree');
+      expect(result).toEqual(tree);
+    });
+
+    it('should return empty array for empty vault', async () => {
+      mockJsonResponse(kyMock.get, { tree: [] });
+
+      const result = await resource.getTree('v1');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('archive', () => {
+    it('should archive a vault and return the vault', async () => {
+      const mockVault = { id: 'v1', name: 'Vault', isArchived: true, archivedAt: '2024-01-01' };
+      mockJsonResponse(kyMock.patch, { vault: mockVault });
+
+      const result = await resource.archive('v1');
+
+      expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1/archive');
+      expect(result).toEqual(mockVault);
+    });
+  });
+
+  describe('unarchive', () => {
+    it('should unarchive a vault and return the vault', async () => {
+      const mockVault = { id: 'v1', name: 'Vault', isArchived: false, archivedAt: null };
+      mockJsonResponse(kyMock.patch, { vault: mockVault });
+
+      const result = await resource.unarchive('v1');
+
+      expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1/unarchive');
+      expect(result).toEqual(mockVault);
+    });
+  });
+
+  describe('createExport', () => {
+    it('should create a vault export job', async () => {
+      const mockExport = {
+        id: 'exp1',
+        vaultId: 'v1',
+        status: 'pending' as const,
+        format: 'zip' as const,
+        includeMetadata: true,
+        createdAt: '2024-01-01',
+      };
+      mockJsonResponse(kyMock.post, mockExport);
+
+      const result = await resource.createExport('v1', { includeMetadata: true });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/export', { json: { includeMetadata: true } });
+      expect(result).toEqual(mockExport);
+      expect(result.status).toBe('pending');
+    });
+
+    it('should create a vault export with default params', async () => {
+      const mockExport = { id: 'exp2', vaultId: 'v1', status: 'pending' as const, format: 'zip' as const, includeMetadata: false, createdAt: '2024-01-01' };
+      mockJsonResponse(kyMock.post, mockExport);
+
+      await resource.createExport('v1');
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/export', { json: {} });
+    });
+  });
+
+  describe('listExports', () => {
+    it('should list vault exports', async () => {
+      const exports = [
+        { id: 'exp1', vaultId: 'v1', status: 'complete' as const, format: 'zip' as const, includeMetadata: false, createdAt: '2024-01-01', completedAt: '2024-01-01' },
+      ];
+      mockJsonResponse(kyMock.get, { exports });
+
+      const result = await resource.listExports('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/export');
+      expect(result).toEqual(exports);
+    });
+
+    it('should return empty array when no exports', async () => {
+      mockJsonResponse(kyMock.get, { exports: [] });
+
+      const result = await resource.listExports('v1');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('downloadExport', () => {
+    it('should download an export as a Blob', async () => {
+      const blob = new Blob(['test content'], { type: 'application/zip' });
+      kyMock.get.mockReturnValue({
+        json: vi.fn().mockResolvedValue(undefined),
+        text: vi.fn().mockResolvedValue(''),
+        blob: vi.fn().mockResolvedValue(blob),
+        ok: true,
+        status: 200,
+      });
+
+      const result = await resource.downloadExport('v1', 'exp1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/export/exp1/download');
+      expect(result).toBeInstanceOf(Blob);
+    });
+  });
+
+  describe('transfer', () => {
+    it('should transfer a vault to another user', async () => {
+      const mockVault = { id: 'v1', name: 'Vault', userId: 'u2' };
+      mockJsonResponse(kyMock.post, { vault: mockVault });
+
+      const result = await resource.transfer('v1', 'newowner@example.com');
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/transfer', { json: { targetEmail: 'newowner@example.com' } });
+      expect(result).toEqual(mockVault);
+    });
+  });
+
+  describe('getMfaConfig', () => {
+    it('should get vault MFA config', async () => {
+      const mockConfig = { mfaRequired: true, sessionWindowMinutes: 60, userVerified: false, verificationExpiresAt: null };
+      mockJsonResponse(kyMock.get, mockConfig);
+
+      const result = await resource.getMfaConfig('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/mfa');
+      expect(result).toEqual(mockConfig);
+      expect(result.mfaRequired).toBe(true);
+    });
+  });
+
+  describe('setMfaConfig', () => {
+    it('should set vault MFA config via PUT', async () => {
+      const mockConfig = { mfaRequired: true, sessionWindowMinutes: 30 };
+      mockJsonResponse(kyMock.put, mockConfig);
+
+      const result = await resource.setMfaConfig('v1', { mfaRequired: true, sessionWindowMinutes: 30 });
+
+      expect(kyMock.put).toHaveBeenCalledWith('vaults/v1/mfa', { json: { mfaRequired: true, sessionWindowMinutes: 30 } });
+      expect(result).toEqual(mockConfig);
+    });
+  });
+
+  describe('verifyMfa', () => {
+    it('should verify MFA and return verified status', async () => {
+      const mockResponse = { verified: true, expiresAt: '2024-01-01T12:00:00Z' };
+      mockJsonResponse(kyMock.post, mockResponse);
+
+      const result = await resource.verifyMfa('v1', { method: 'totp', code: '123456' });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/mfa/verify', { json: { method: 'totp', code: '123456' } });
+      expect(result.verified).toBe(true);
+      expect(result.expiresAt).toBe('2024-01-01T12:00:00Z');
+    });
+
+    it('should verify MFA with backup code method', async () => {
+      const mockResponse = { verified: true, expiresAt: '2024-01-01T12:00:00Z' };
+      mockJsonResponse(kyMock.post, mockResponse);
+
+      const result = await resource.verifyMfa('v1', { method: 'backup_code', code: 'ABCD1234' });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/mfa/verify', { json: { method: 'backup_code', code: 'ABCD1234' } });
+      expect(result.verified).toBe(true);
     });
   });
 });

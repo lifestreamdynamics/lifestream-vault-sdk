@@ -137,6 +137,12 @@ export interface SystemHealth {
   uptime: number;
 }
 
+export interface BackupStatus {
+  lastBackupAt: string | null;
+  status: string;
+  details?: Record<string, unknown>;
+}
+
 /**
  * Resource for admin operations including system stats, user management,
  * activity monitoring, subscription summaries, and system health.
@@ -361,6 +367,14 @@ export class AdminResource {
       return await this.http.get('admin/health').json<SystemHealth>();
     } catch (error) {
       throw await handleError(error, 'Health', '');
+    }
+  }
+
+  async getBackupStatus(): Promise<BackupStatus> {
+    try {
+      return await this.http.get('admin/backups/status').json<BackupStatus>();
+    } catch (error) {
+      throw await handleError(error, 'Admin', '');
     }
   }
 }

@@ -100,6 +100,12 @@ export interface DocumentListItem {
   fileModifiedAt: string;
 }
 
+/** Result of a bulk operation on multiple documents. */
+export interface BulkOperationResult {
+  succeeded: string[];
+  failed: Array<{ path: string; error: string }>;
+}
+
 /**
  * Resource for managing documents within vaults.
  *
@@ -522,6 +528,46 @@ export class DocumentsResource {
       return data.backlinks;
     } catch (error) {
       throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  async bulkMove(vaultId: string, params: { paths: string[]; targetDirectory: string }): Promise<BulkOperationResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/bulk-move`, { json: params }).json<BulkOperationResult>();
+    } catch (error) {
+      throw await handleError(error, 'Document', vaultId);
+    }
+  }
+
+  async bulkCopy(vaultId: string, params: { paths: string[]; targetDirectory: string }): Promise<BulkOperationResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/bulk-copy`, { json: params }).json<BulkOperationResult>();
+    } catch (error) {
+      throw await handleError(error, 'Document', vaultId);
+    }
+  }
+
+  async bulkDelete(vaultId: string, params: { paths: string[] }): Promise<BulkOperationResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/bulk-delete`, { json: params }).json<BulkOperationResult>();
+    } catch (error) {
+      throw await handleError(error, 'Document', vaultId);
+    }
+  }
+
+  async bulkTag(vaultId: string, params: { paths: string[]; addTags?: string[]; removeTags?: string[] }): Promise<BulkOperationResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/bulk-tag`, { json: params }).json<BulkOperationResult>();
+    } catch (error) {
+      throw await handleError(error, 'Document', vaultId);
+    }
+  }
+
+  async createDirectory(vaultId: string, path: string): Promise<{ path: string; created: boolean }> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/documents/directories`, { json: { path } }).json<{ path: string; created: boolean }>();
+    } catch (error) {
+      throw await handleError(error, 'Document', vaultId);
     }
   }
 }

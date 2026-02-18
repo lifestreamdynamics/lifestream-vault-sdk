@@ -235,4 +235,114 @@ describe('DocumentsResource', () => {
       await expect(resource.getBacklinks('v1', 'doc.md')).rejects.toBeInstanceOf(NetworkError);
     });
   });
+
+  describe('bulkMove', () => {
+    it('should bulk move documents to a target directory', async () => {
+      const mockResult = {
+        succeeded: ['notes/a.md', 'notes/b.md'],
+        failed: [],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.bulkMove('v1', { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'archive/' });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-move', {
+        json: { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'archive/' },
+      });
+      expect(result.succeeded).toHaveLength(2);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should report failed paths in bulk move result', async () => {
+      const mockResult = {
+        succeeded: ['notes/a.md'],
+        failed: [{ path: 'notes/missing.md', error: 'Document not found' }],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.bulkMove('v1', { paths: ['notes/a.md', 'notes/missing.md'], targetDirectory: 'archive/' });
+
+      expect(result.succeeded).toEqual(['notes/a.md']);
+      expect(result.failed[0].path).toBe('notes/missing.md');
+    });
+  });
+
+  describe('bulkCopy', () => {
+    it('should bulk copy documents to a target directory', async () => {
+      const mockResult = {
+        succeeded: ['notes/a.md', 'notes/b.md'],
+        failed: [],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.bulkCopy('v1', { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'backup/' });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-copy', {
+        json: { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'backup/' },
+      });
+      expect(result.succeeded).toHaveLength(2);
+    });
+  });
+
+  describe('bulkDelete', () => {
+    it('should bulk delete documents', async () => {
+      const mockResult = {
+        succeeded: ['old/a.md', 'old/b.md'],
+        failed: [],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.bulkDelete('v1', { paths: ['old/a.md', 'old/b.md'] });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-delete', {
+        json: { paths: ['old/a.md', 'old/b.md'] },
+      });
+      expect(result.succeeded).toEqual(['old/a.md', 'old/b.md']);
+    });
+  });
+
+  describe('bulkTag', () => {
+    it('should bulk add tags to documents', async () => {
+      const mockResult = {
+        succeeded: ['notes/a.md', 'notes/b.md'],
+        failed: [],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.bulkTag('v1', {
+        paths: ['notes/a.md', 'notes/b.md'],
+        addTags: ['archived'],
+        removeTags: ['draft'],
+      });
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-tag', {
+        json: { paths: ['notes/a.md', 'notes/b.md'], addTags: ['archived'], removeTags: ['draft'] },
+      });
+      expect(result.succeeded).toHaveLength(2);
+    });
+  });
+
+  describe('createDirectory', () => {
+    it('should create a new directory in the vault', async () => {
+      const mockResult = { path: 'notes/projects/', created: true };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.createDirectory('v1', 'notes/projects/');
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/directories', {
+        json: { path: 'notes/projects/' },
+      });
+      expect(result.path).toBe('notes/projects/');
+      expect(result.created).toBe(true);
+    });
+
+    it('should return created false if directory already exists', async () => {
+      const mockResult = { path: 'notes/', created: false };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.createDirectory('v1', 'notes/');
+
+      expect(result.created).toBe(false);
+    });
+  });
 });

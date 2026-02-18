@@ -363,4 +363,102 @@ describe('TeamsResource', () => {
       await expect(resource.listVaults('nonexistent')).rejects.toBeInstanceOf(NotFoundError);
     });
   });
+
+  // ── Team Calendar ───────────────────────────────────────────────────
+
+  describe('getCalendar', () => {
+    it('should get team calendar data for a date range', async () => {
+      const mockResponse = {
+        days: { '2024-01-01': { date: '2024-01-01', activityCount: 3, events: [], dueDocs: [] } },
+        start: '2024-01-01',
+        end: '2024-01-31',
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getCalendar('t1', { start: '2024-01-01', end: '2024-01-31' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+      expect(result.start).toBe('2024-01-01');
+      expect(result.end).toBe('2024-01-31');
+    });
+
+    it('should include types filter when provided', async () => {
+      const mockResponse = { days: {}, start: '2024-01-01', end: '2024-01-31' };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      await resource.getCalendar('t1', { start: '2024-01-01', end: '2024-01-31', types: 'events,due' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getCalendar('t1', { start: '2024-01-01', end: '2024-01-31' })).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('getCalendarActivity', () => {
+    it('should get team calendar activity for a date range', async () => {
+      const mockResponse = {
+        days: [
+          { date: '2024-01-01', created: 2, updated: 1, deleted: 0, total: 3 },
+        ],
+        start: '2024-01-01',
+        end: '2024-01-31',
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getCalendarActivity('t1', { start: '2024-01-01', end: '2024-01-31' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/activity',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+      expect(result.days).toHaveLength(1);
+      expect(result.days[0].total).toBe(3);
+    });
+  });
+
+  describe('getCalendarEvents', () => {
+    it('should get team calendar events and unwrap events array', async () => {
+      const mockEvents = [
+        { id: 'e1', vaultId: 'v1', userId: 'u1', title: 'Team Meeting', startDate: '2024-01-15', allDay: false, completed: false, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+      ];
+      mockJsonResponse(kyMock.get, { events: mockEvents });
+
+      const result = await resource.getCalendarEvents('t1');
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/events',
+        expect.objectContaining({ searchParams: undefined }),
+      );
+      expect(result).toEqual(mockEvents);
+    });
+
+    it('should pass date range filter when provided', async () => {
+      mockJsonResponse(kyMock.get, { events: [] });
+
+      await resource.getCalendarEvents('t1', { start: '2024-01-01', end: '2024-01-31' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/events',
+        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+      );
+    });
+
+    it('should return empty array when no events', async () => {
+      mockJsonResponse(kyMock.get, { events: [] });
+
+      const result = await resource.getCalendarEvents('t1');
+
+      expect(result).toEqual([]);
+    });
+  });
 });

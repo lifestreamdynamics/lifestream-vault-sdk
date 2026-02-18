@@ -242,4 +242,57 @@ describe('PublishResource', () => {
       await expect(resource.delete('v1', 'doc.md')).rejects.toBeInstanceOf(NetworkError);
     });
   });
+
+  describe('getSubdomain', () => {
+    it('should get the subdomain for a vault', async () => {
+      mockJsonResponse(kyMock.get, { subdomain: 'my-site' });
+
+      const result = await resource.getSubdomain('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/publish/subdomain');
+      expect(result.subdomain).toBe('my-site');
+    });
+
+    it('should return null subdomain when not set', async () => {
+      mockJsonResponse(kyMock.get, { subdomain: null });
+
+      const result = await resource.getSubdomain('v1');
+
+      expect(result.subdomain).toBeNull();
+    });
+  });
+
+  describe('setSubdomain', () => {
+    it('should set the subdomain for a vault', async () => {
+      mockJsonResponse(kyMock.put, { subdomain: 'my-custom-site' });
+
+      const result = await resource.setSubdomain('v1', 'my-custom-site');
+
+      expect(kyMock.put).toHaveBeenCalledWith('vaults/v1/publish/subdomain', { json: { subdomain: 'my-custom-site' } });
+      expect(result.subdomain).toBe('my-custom-site');
+    });
+
+    it('should throw ConflictError if subdomain is already taken', async () => {
+      mockHTTPError(kyMock.put, 409, { message: 'Subdomain already taken' });
+
+      await expect(resource.setSubdomain('v1', 'taken')).rejects.toBeInstanceOf(ConflictError);
+    });
+  });
+
+  describe('deleteSubdomain', () => {
+    it('should delete the subdomain and return success message', async () => {
+      mockJsonResponse(kyMock.delete, { message: 'Subdomain removed' });
+
+      const result = await resource.deleteSubdomain('v1');
+
+      expect(kyMock.delete).toHaveBeenCalledWith('vaults/v1/publish/subdomain');
+      expect(result.message).toBe('Subdomain removed');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.delete);
+
+      await expect(resource.deleteSubdomain('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
 });

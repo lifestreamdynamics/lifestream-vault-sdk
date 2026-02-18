@@ -15,6 +15,9 @@ import { HooksResource } from './resources/hooks.js';
 import { WebhooksResource } from './resources/webhooks.js';
 import { MfaResource } from './resources/mfa.js';
 import { CalendarResource } from './resources/calendar.js';
+import { CustomDomainsResource } from './resources/custom-domains.js';
+import { AnalyticsResource } from './resources/analytics.js';
+import { PublishVaultResource } from './resources/publish-vault.js';
 import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
@@ -124,6 +127,12 @@ export class LifestreamVaultClient {
   readonly mfa: MfaResource;
   /** Calendar, activity, and due date operations. */
   readonly calendar: CalendarResource;
+  /** Custom domain management for published vaults. */
+  readonly customDomains: CustomDomainsResource;
+  /** Analytics for published documents and share links. */
+  readonly analytics: AnalyticsResource;
+  /** Whole-vault publishing (multi-document public sites). */
+  readonly publishVault: PublishVaultResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
 
@@ -307,6 +316,9 @@ export class LifestreamVaultClient {
     this.webhooks = new WebhooksResource(this.http);
     this.mfa = new MfaResource(this.http);
     this.calendar = new CalendarResource(this.http);
+    this.customDomains = new CustomDomainsResource(this.http);
+    this.analytics = new AnalyticsResource(this.http);
+    this.publishVault = new PublishVaultResource(this.http);
   }
 
   /**

@@ -17,6 +17,16 @@ export interface Vault {
   createdAt: string;
   /** ISO 8601 last-updated timestamp. */
   updatedAt: string;
+  /** Whether the vault is archived. */
+  isArchived: boolean;
+  /** ISO 8601 timestamp when the vault was archived, or null. */
+  archivedAt: string | null;
+  /** Team ID if the vault belongs to a team, or null. */
+  teamId: string | null;
+  /** ID of the user who owns the vault. */
+  userId: string;
+  /** Base directory filter for this vault, or null. */
+  baseDir: string | null;
 }
 
 /** Node in the vault link graph. */
@@ -51,6 +61,34 @@ export interface UnresolvedLinkReference {
 export interface UnresolvedLink {
   targetPath: string;
   references: UnresolvedLinkReference[];
+}
+
+/** A node in the vault file tree. */
+export interface VaultTreeNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  children?: VaultTreeNode[];
+}
+
+/** A vault export job record. */
+export interface VaultExportRecord {
+  id: string;
+  vaultId: string;
+  status: 'pending' | 'processing' | 'complete' | 'failed';
+  format: 'zip';
+  includeMetadata: boolean;
+  downloadUrl?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+/** Vault-level MFA configuration and verification state. */
+export interface VaultMfaConfig {
+  mfaRequired: boolean;
+  sessionWindowMinutes: number;
+  userVerified?: boolean;
+  verificationExpiresAt?: string | null;
 }
 
 /**
@@ -176,7 +214,7 @@ export class VaultsResource {
    */
   async update(vaultId: string, params: { name?: string; description?: string | null }): Promise<Vault> {
     try {
-      return await this.http.put(`vaults/${vaultId}`, { json: params }).json<Vault>();
+      return await this.http.patch(`vaults/${vaultId}`, { json: params }).json<Vault>();
     } catch (error) {
       throw await handleError(error, 'Vault', vaultId);
     }
@@ -260,6 +298,91 @@ export class VaultsResource {
     try {
       const data = await this.http.get(`vaults/${vaultId}/links/unresolved`).json<{ unresolvedLinks: UnresolvedLink[] }>();
       return data.unresolvedLinks;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async getTree(vaultId: string): Promise<VaultTreeNode[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/tree`).json<{ tree: VaultTreeNode[] }>();
+      return data.tree;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async archive(vaultId: string): Promise<Vault> {
+    try {
+      const data = await this.http.patch(`vaults/${vaultId}/archive`).json<{ vault: Vault }>();
+      return data.vault;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async unarchive(vaultId: string): Promise<Vault> {
+    try {
+      const data = await this.http.patch(`vaults/${vaultId}/unarchive`).json<{ vault: Vault }>();
+      return data.vault;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async createExport(vaultId: string, params?: { includeMetadata?: boolean; format?: 'zip' }): Promise<VaultExportRecord> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/export`, { json: params ?? {} }).json<VaultExportRecord>();
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async listExports(vaultId: string): Promise<VaultExportRecord[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/export`).json<{ exports: VaultExportRecord[] }>();
+      return data.exports;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async downloadExport(vaultId: string, exportId: string): Promise<Blob> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/export/${exportId}/download`).blob();
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async transfer(vaultId: string, targetEmail: string): Promise<Vault> {
+    try {
+      const data = await this.http.post(`vaults/${vaultId}/transfer`, { json: { targetEmail } }).json<{ vault: Vault }>();
+      return data.vault;
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async getMfaConfig(vaultId: string): Promise<VaultMfaConfig> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/mfa`).json<VaultMfaConfig>();
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async setMfaConfig(vaultId: string, params: { mfaRequired: boolean; sessionWindowMinutes?: number }): Promise<VaultMfaConfig> {
+    try {
+      return await this.http.put(`vaults/${vaultId}/mfa`, { json: params }).json<VaultMfaConfig>();
+    } catch (error) {
+      throw await handleError(error, 'Vault', vaultId);
+    }
+  }
+
+  async verifyMfa(vaultId: string, params: { method: 'totp' | 'backup_code'; code: string }): Promise<{ verified: boolean; expiresAt: string }> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/mfa/verify`, { json: params }).json<{ verified: boolean; expiresAt: string }>();
     } catch (error) {
       throw await handleError(error, 'Vault', vaultId);
     }
