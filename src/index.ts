@@ -60,7 +60,24 @@ export type {
   CreateCalendarEventInput,
   AgendaGroup,
   AgendaResponse,
+  TimelineItem,
+  TimelineResponse,
+  UpcomingResponse,
+  ICalTokenResponse,
+  ICalTokenStatus,
+  CalendarConnector,
+  CalendarConnectorSyncResult,
 } from './resources/calendar.js';
+export { BookingResource } from './resources/booking.js';
+export type {
+  EventSlot,
+  Booking,
+  AvailableTime,
+  AvailabilityResponse,
+  CreateSlotInput,
+  UpdateSlotInput,
+  BookingFilters,
+} from './resources/booking.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
 export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';
 export { AnalyticsResource } from './resources/analytics.js';

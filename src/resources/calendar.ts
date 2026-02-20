@@ -1,6 +1,15 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
 
+export interface RecurrenceRule {
+  freq: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval?: number;
+  days?: string[];
+  monthWeek?: number;
+  endDate?: string;
+  count?: number;
+}
+
 export interface CalendarEvent {
   id: string;
   vaultId: string;
@@ -10,10 +19,18 @@ export interface CalendarEvent {
   startDate: string;
   endDate?: string;
   allDay: boolean;
-  recurrence?: string;
+  recurrenceRule?: RecurrenceRule;
   completed: boolean;
   priority?: string;
   color?: string;
+  backingFilePath?: string;
+  status?: string;
+  timezone?: string;
+  location?: string;
+  metadata?: unknown;
+  isPublic?: boolean;
+  maxAttendees?: number;
+  externalId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,7 +88,7 @@ export interface CreateCalendarEventInput {
   startDate: string;
   endDate?: string;
   allDay?: boolean;
-  recurrence?: string;
+  recurrenceRule?: RecurrenceRule;
   priority?: string;
   color?: string;
 }
@@ -289,4 +306,230 @@ export class CalendarResource {
       throw await handleError(error, 'Calendar', vaultId);
     }
   }
+
+  /**
+   * Get timeline of upcoming events for a vault.
+   *
+   * @param vaultId - Vault ID
+   * @param params - Optional pagination parameters
+   * @param params.cursor - Pagination cursor from a previous response
+   * @param params.limit - Maximum number of items to return
+   * @returns Paginated timeline response
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async getTimeline(vaultId: string, params?: { cursor?: string; limit?: number }): Promise<TimelineResponse> {
+    try {
+      const searchParams: Record<string, string> = {};
+      if (params?.cursor) searchParams.cursor = params.cursor;
+      if (params?.limit !== undefined) searchParams.limit = String(params.limit);
+      return await this.http.get(`vaults/${vaultId}/calendar/timeline`, { searchParams }).json<TimelineResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Calendar Timeline', vaultId);
+    }
+  }
+
+  /**
+   * Get upcoming events and due items for a vault.
+   *
+   * @param vaultId - Vault ID
+   * @returns Upcoming items summary
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async getUpcoming(vaultId: string): Promise<UpcomingResponse> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/calendar/upcoming`).json<UpcomingResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Calendar Upcoming', vaultId);
+    }
+  }
+
+  /**
+   * Generate a new iCal token for subscribing to a vault's calendar feed.
+   *
+   * @param vaultId - Vault ID
+   * @returns The generated token and feed URL
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async generateICalToken(vaultId: string): Promise<ICalTokenResponse> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/calendar/token`).json<ICalTokenResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Generate iCal Token', vaultId);
+    }
+  }
+
+  /**
+   * Revoke the current iCal token for a vault.
+   *
+   * @param vaultId - Vault ID
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async revokeICalToken(vaultId: string): Promise<void> {
+    try {
+      await this.http.delete(`vaults/${vaultId}/calendar/token`);
+    } catch (error) {
+      throw await handleError(error, 'Revoke iCal Token', vaultId);
+    }
+  }
+
+  /**
+   * Check whether an iCal token exists for a vault.
+   *
+   * @param vaultId - Vault ID
+   * @returns Token status
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async getICalTokenStatus(vaultId: string): Promise<ICalTokenStatus> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/calendar/token/status`).json<ICalTokenStatus>();
+    } catch (error) {
+      throw await handleError(error, 'iCal Token Status', vaultId);
+    }
+  }
+
+  /**
+   * Toggle the completed state of a document.
+   * If the document is not yet completed, sets `completedAt` to now.
+   * If it is already completed, clears `completedAt`.
+   *
+   * @param vaultId - Vault ID
+   * @param documentPath - Path of the document within the vault
+   * @returns The updated document metadata
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault or document does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async toggleComplete(vaultId: string, documentPath: string): Promise<unknown> {
+    try {
+      return await this.http.patch(`vaults/${vaultId}/documents/${documentPath}`, {
+        json: { completedAt: new Date().toISOString() },
+      }).json();
+    } catch (error) {
+      throw await handleError(error, 'Toggle Complete', documentPath);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Calendar connectors
+  // ---------------------------------------------------------------------------
+
+  /**
+   * List calendar connectors (Google Calendar, Outlook, etc.) for a vault.
+   *
+   * @param vaultId - Vault ID
+   * @returns Array of calendar connectors
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async listConnectors(vaultId: string): Promise<CalendarConnector[]> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/calendar/connectors`).json<CalendarConnector[]>();
+    } catch (error) {
+      throw await handleError(error, 'Calendar Connectors', vaultId);
+    }
+  }
+
+  /**
+   * Disconnect a calendar connector from a vault.
+   *
+   * @param vaultId - Vault ID
+   * @param connectorId - Connector ID to disconnect
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault or connector does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async disconnectConnector(vaultId: string, connectorId: string): Promise<void> {
+    try {
+      await this.http.delete(`vaults/${vaultId}/calendar/connectors/${connectorId}`);
+    } catch (error) {
+      throw await handleError(error, 'Disconnect Connector', connectorId);
+    }
+  }
+
+  /**
+   * Trigger a manual sync for a calendar connector.
+   *
+   * @param vaultId - Vault ID
+   * @param connectorId - Connector ID to sync
+   * @returns Sync result
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault
+   * @throws {NotFoundError} If the vault or connector does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async syncConnector(vaultId: string, connectorId: string): Promise<CalendarConnectorSyncResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/calendar/connectors/${connectorId}/sync`).json<CalendarConnectorSyncResult>();
+    } catch (error) {
+      throw await handleError(error, 'Sync Connector', connectorId);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Additional interfaces for new methods
+// ---------------------------------------------------------------------------
+
+export interface TimelineItem {
+  type: 'event' | 'due';
+  date: string;
+  event?: CalendarEvent;
+  document?: DueDocument;
+}
+
+export interface TimelineResponse {
+  items: TimelineItem[];
+  nextCursor?: string;
+  total: number;
+}
+
+export interface UpcomingResponse {
+  events: CalendarEvent[];
+  dueDocs: DueDocument[];
+}
+
+export interface ICalTokenResponse {
+  token: string;
+  feedUrl: string;
+  createdAt: string;
+}
+
+export interface ICalTokenStatus {
+  hasToken: boolean;
+  createdAt?: string;
+}
+
+export interface CalendarConnector {
+  id: string;
+  userId: string;
+  vaultId: string;
+  provider: 'google' | 'outlook';
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CalendarConnectorSyncResult {
+  synced: number;
+  errors: number;
+  syncedAt: string;
 }

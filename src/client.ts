@@ -18,6 +18,7 @@ import { CalendarResource } from './resources/calendar.js';
 import { CustomDomainsResource } from './resources/custom-domains.js';
 import { AnalyticsResource } from './resources/analytics.js';
 import { PublishVaultResource } from './resources/publish-vault.js';
+import { BookingResource } from './resources/booking.js';
 import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
@@ -133,6 +134,8 @@ export class LifestreamVaultClient {
   readonly analytics: AnalyticsResource;
   /** Whole-vault publishing (multi-document public sites). */
   readonly publishVault: PublishVaultResource;
+  /** Booking slot and guest booking management. */
+  readonly booking: BookingResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
 
@@ -319,6 +322,7 @@ export class LifestreamVaultClient {
     this.customDomains = new CustomDomainsResource(this.http);
     this.analytics = new AnalyticsResource(this.http);
     this.publishVault = new PublishVaultResource(this.http);
+    this.booking = new BookingResource(this.http);
   }
 
   /**
