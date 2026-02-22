@@ -77,6 +77,10 @@ export type {
   CreateSlotInput,
   UpdateSlotInput,
   BookingFilters,
+  WaitlistStatus,
+  BookingWaitlistEntry,
+  JoinWaitlistInput,
+  WaitlistFilters,
 } from './resources/booking.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
 export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';

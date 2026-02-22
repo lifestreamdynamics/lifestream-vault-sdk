@@ -207,6 +207,25 @@ export class CalendarResource {
   }
 
   /**
+   * Get a single calendar event by ID.
+   *
+   * @param vaultId - Vault ID
+   * @param eventId - Event ID
+   * @returns The calendar event
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access to the vault or event
+   * @throws {NotFoundError} If the vault or event does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async getEvent(vaultId: string, eventId: string): Promise<CalendarEvent> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/calendar/events/${eventId}`).json<CalendarEvent>();
+    } catch (error) {
+      throw await handleError(error, 'Calendar Event', eventId);
+    }
+  }
+
+  /**
    * Create a new calendar event in a vault.
    *
    * @param vaultId - Vault ID
@@ -483,6 +502,115 @@ export class CalendarResource {
       throw await handleError(error, 'Sync Connector', connectorId);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Event participant management (Pro tier)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * List participants for a calendar event.
+   *
+   * @param vaultId - Vault ID
+   * @param eventId - Calendar event ID
+   * @returns Array of event participants
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access or insufficient subscription tier
+   * @throws {NotFoundError} If the vault or event does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async listParticipants(vaultId: string, eventId: string): Promise<EventParticipant[]> {
+    try {
+      const data = await this.http
+        .get(`vaults/${vaultId}/calendar/events/${eventId}/participants`)
+        .json<{ participants: EventParticipant[] }>();
+      return data.participants;
+    } catch (error) {
+      throw await handleError(error, 'Participants', eventId);
+    }
+  }
+
+  /**
+   * Add a participant to a calendar event.
+   *
+   * @param vaultId - Vault ID
+   * @param eventId - Calendar event ID
+   * @param data - Participant data
+   * @param data.email - Participant email address
+   * @param data.name - Optional participant display name
+   * @param data.role - Participant role: 'organizer', 'attendee', or 'optional' (default: 'attendee')
+   * @returns The created participant record
+   * @throws {ValidationError} If the participant data is invalid
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access or insufficient subscription tier
+   * @throws {NotFoundError} If the vault or event does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async addParticipant(
+    vaultId: string,
+    eventId: string,
+    data: { email: string; name?: string; role?: string },
+  ): Promise<EventParticipant> {
+    try {
+      return await this.http
+        .post(`vaults/${vaultId}/calendar/events/${eventId}/participants`, { json: data })
+        .json<EventParticipant>();
+    } catch (error) {
+      throw await handleError(error, 'Add Participant', data.email);
+    }
+  }
+
+  /**
+   * Update a participant's status for a calendar event.
+   *
+   * @param vaultId - Vault ID
+   * @param eventId - Calendar event ID
+   * @param participantId - Participant ID
+   * @param data - Update data (status)
+   * @returns The updated participant record
+   * @throws {ValidationError} If the status is invalid
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access or insufficient subscription tier
+   * @throws {NotFoundError} If the vault, event, or participant does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async updateParticipant(
+    vaultId: string,
+    eventId: string,
+    participantId: string,
+    data: { status: string },
+  ): Promise<EventParticipant> {
+    try {
+      return await this.http
+        .patch(
+          `vaults/${vaultId}/calendar/events/${eventId}/participants/${participantId}`,
+          { json: data },
+        )
+        .json<EventParticipant>();
+    } catch (error) {
+      throw await handleError(error, 'Update Participant', participantId);
+    }
+  }
+
+  /**
+   * Remove a participant from a calendar event.
+   *
+   * @param vaultId - Vault ID
+   * @param eventId - Calendar event ID
+   * @param participantId - Participant ID
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user does not have access or insufficient subscription tier
+   * @throws {NotFoundError} If the vault, event, or participant does not exist
+   * @throws {NetworkError} If the request fails due to network issues
+   */
+  async removeParticipant(vaultId: string, eventId: string, participantId: string): Promise<void> {
+    try {
+      await this.http.delete(
+        `vaults/${vaultId}/calendar/events/${eventId}/participants/${participantId}`,
+      );
+    } catch (error) {
+      throw await handleError(error, 'Remove Participant', participantId);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -532,4 +660,16 @@ export interface CalendarConnectorSyncResult {
   synced: number;
   errors: number;
   syncedAt: string;
+}
+
+export interface EventParticipant {
+  id: string;
+  calendarEventId: string;
+  userId?: string;
+  email: string;
+  name?: string;
+  status: 'invited' | 'accepted' | 'declined' | 'tentative';
+  role: 'organizer' | 'attendee' | 'optional';
+  respondedAt?: string;
+  createdAt: string;
 }
