@@ -637,6 +637,112 @@ const passkeys = await client.mfa.listPasskeys();
 const codes = await client.mfa.regenerateBackupCodes();
 ```
 
+### Analytics
+
+View counts for published documents and share links.
+
+```typescript
+// Summary across all published documents
+const summary = await client.analytics.getPublishedSummary();
+console.log(`Total views: ${summary.totalViews}`);
+
+// Analytics for a specific share link
+const shareStats = await client.analytics.getShareAnalytics('vault-id', 'share-id');
+console.log(`Share views: ${shareStats.viewCount}`);
+
+// Analytics for a specific published document
+const docStats = await client.analytics.getPublishedDocAnalytics('vault-id', 'published-doc-id');
+console.log(`Views by day:`, docStats.viewsByDay);
+```
+
+### Booking
+
+Manage bookable event slots, guest bookings, templates, team booking groups, and the waitlist. Slot CRUD and booking management require the Pro tier (`calendarBookingBasic`). Team booking groups and waitlist require Business tier (`calendarBookingAdvanced`).
+
+```typescript
+// Create a bookable event slot
+const slot = await client.booking.createSlot('vault-id', {
+  title: '30-Minute Consultation',
+  durationMin: 30,
+  startTime: '09:00',
+  endTime: '17:00',
+  daysOfWeek: ['mon', 'tue', 'wed', 'thu', 'fri'],
+  timezone: 'America/Toronto',
+});
+
+// Check availability
+const availability = await client.booking.getAvailability('vault-id', slot.id, '2026-03-15');
+console.log('Open times:', availability.times);
+
+// List bookings with filters
+const { bookings } = await client.booking.listBookings('vault-id', {
+  status: 'pending',
+  startAfter: '2026-03-01',
+});
+
+// Confirm a booking
+const confirmed = await client.booking.updateBookingStatus('vault-id', 'booking-id', 'confirmed');
+
+// Reschedule via guest token (no auth required)
+await client.booking.rescheduleBooking('reschedule-token', '2026-04-15T10:00:00Z');
+
+// Get booking analytics (Business tier)
+const analytics = await client.booking.getBookingAnalytics('vault-id', { view: 'volume' });
+
+// Team round-robin booking groups (Business tier)
+const group = await client.booking.createBookingGroup('team-id', {
+  name: 'Sales Team',
+  assignmentMode: 'round_robin',
+});
+await client.booking.addGroupMember('team-id', group.id, { userId: 'user-id' });
+```
+
+### Custom Domains
+
+Map custom domains to published vault sites.
+
+```typescript
+// Add a domain
+const domain = await client.customDomains.create({ domain: 'docs.example.com' });
+console.log('Add TXT record:', domain.verificationToken);
+
+// Check DNS configuration
+const check = await client.customDomains.checkDns(domain.id);
+console.log('DNS resolved:', check.resolved);
+
+// Verify once TXT record is in place
+const verified = await client.customDomains.verify(domain.id);
+console.log('Verified:', verified.verified);
+
+// List all custom domains
+const domains = await client.customDomains.list();
+```
+
+### Publish Vault
+
+Publish a whole vault as a multi-document public site. Requires Pro tier.
+
+```typescript
+// Publish a vault as a public site
+const site = await client.publishVault.publish('vault-id', {
+  slug: 'my-docs',
+  title: 'My Documentation',
+  description: 'Public knowledge base',
+  enableSearch: true,
+  showSidebar: true,
+});
+console.log(`Published at /${site.slug}`);
+
+// Attach a verified custom domain
+await client.publishVault.update('vault-id', { customDomainId: 'domain-id' });
+
+// List all published sites
+const sites = await client.publishVault.listMine();
+
+// Unpublish
+await client.publishVault.unpublish('vault-id');
+```
+
 ## ⚙️ Configuration
 
 ### ClientOptions
