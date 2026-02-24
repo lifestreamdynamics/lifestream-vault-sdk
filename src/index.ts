@@ -81,6 +81,18 @@ export type {
   BookingWaitlistEntry,
   JoinWaitlistInput,
   WaitlistFilters,
+  TeamBookingGroup,
+  TeamBookingGroupMember,
+  CreateBookingGroupInput,
+  UpdateBookingGroupInput,
+  AssignmentMode,
+  AddGroupMemberInput,
+  BookingAnalytics,
+  AnalyticsFilters,
+  EventTemplate,
+  CreateTemplateInput,
+  BookingBranding,
+  PaymentStatus,
 } from './resources/booking.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
 export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';

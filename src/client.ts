@@ -65,7 +65,13 @@ export interface ClientOptions {
  * {@link VaultsResource | vaults}, {@link DocumentsResource | documents},
  * {@link SearchResource | search}, {@link AiResource | ai},
  * {@link ApiKeysResource | apiKeys}, {@link UserResource | user},
- * {@link SubscriptionResource | subscription}, and {@link TeamsResource | teams}.
+ * {@link SubscriptionResource | subscription}, {@link TeamsResource | teams},
+ * {@link SharesResource | shares}, {@link PublishResource | publish},
+ * {@link ConnectorsResource | connectors}, {@link AdminResource | admin},
+ * {@link HooksResource | hooks}, {@link WebhooksResource | webhooks},
+ * {@link MfaResource | mfa}, {@link CalendarResource | calendar},
+ * {@link CustomDomainsResource | customDomains}, {@link AnalyticsResource | analytics},
+ * {@link PublishVaultResource | publishVault}, and {@link BookingResource | booking}.
  *
  * When `baseUrl` is omitted, it defaults to `'https://vault.lifestreamdynamics.com'`.
  *
