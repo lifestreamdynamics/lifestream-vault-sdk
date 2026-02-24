@@ -81,12 +81,6 @@ export type {
   BookingWaitlistEntry,
   JoinWaitlistInput,
   WaitlistFilters,
-  TeamBookingGroup,
-  TeamBookingGroupMember,
-  CreateBookingGroupInput,
-  UpdateBookingGroupInput,
-  AssignmentMode,
-  AddGroupMemberInput,
   BookingAnalytics,
   AnalyticsFilters,
   EventTemplate,
@@ -94,12 +88,34 @@ export type {
   BookingBranding,
   PaymentStatus,
 } from './resources/booking.js';
+export { TeamBookingGroupsResource } from './resources/team-booking-groups.js';
+export type {
+  TeamBookingGroup,
+  TeamBookingGroupMember,
+  CreateBookingGroupInput,
+  UpdateBookingGroupInput,
+  AssignmentMode,
+  AddGroupMemberInput,
+} from './resources/team-booking-groups.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
 export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';
 export { AnalyticsResource } from './resources/analytics.js';
 export type { PublishedSummary, ShareAnalytics, PublishedDocAnalytics } from './resources/analytics.js';
 export { PublishVaultResource } from './resources/publish-vault.js';
 export type { PublishedVault, PublishVaultParams } from './resources/publish-vault.js';
+export { SamlResource } from './resources/saml.js';
+export type { SsoConfig, CreateSsoConfigInput, UpdateSsoConfigInput } from './resources/saml.js';
+export { ScimResource } from './resources/scim.js';
+export type {
+  ScimUser,
+  ScimListResponse,
+  ScimCreateUserInput,
+  ScimUpdateUserInput,
+  ScimServiceProviderConfig,
+} from './resources/scim.js';
+export { PluginsResource } from './resources/plugins.js';
+export type { InstalledPlugin, InstallPluginInput } from './resources/plugins.js';
+export { CollaborationResource } from './resources/collaboration.js';
 
 // Request signing
 export {

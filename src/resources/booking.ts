@@ -1,5 +1,12 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import type {
+  TeamBookingGroup,
+  TeamBookingGroupMember,
+  CreateBookingGroupInput,
+  UpdateBookingGroupInput,
+  AddGroupMemberInput,
+} from './team-booking-groups.js';
 
 // ---------------------------------------------------------------------------
 // Interfaces
@@ -166,50 +173,17 @@ export interface CreateTemplateInput {
 }
 
 // ---------------------------------------------------------------------------
-// Team Booking Groups
+// Team Booking Groups — re-exported from team-booking-groups.ts for backward compat
 // ---------------------------------------------------------------------------
 
-export type AssignmentMode = 'round_robin' | 'least_busy' | 'attendee_choice';
-
-export interface TeamBookingGroup {
-  id: string;
-  teamId: string;
-  name: string;
-  assignmentMode: AssignmentMode;
-  roundRobinIndex: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface TeamBookingGroupMember {
-  id: string;
-  groupId: string;
-  userId: string;
-  weight: number;
-  isActive: boolean;
-  user: {
-    id: string;
-    displayName: string;
-    email: string;
-  };
-}
-
-export interface CreateBookingGroupInput {
-  name: string;
-  assignmentMode?: AssignmentMode;
-}
-
-export interface UpdateBookingGroupInput {
-  name?: string;
-  assignmentMode?: AssignmentMode;
-  isActive?: boolean;
-}
-
-export interface AddGroupMemberInput {
-  userId: string;
-  weight?: number;
-}
+export type {
+  AssignmentMode,
+  TeamBookingGroup,
+  TeamBookingGroupMember,
+  CreateBookingGroupInput,
+  UpdateBookingGroupInput,
+  AddGroupMemberInput,
+} from './team-booking-groups.js';
 
 /**
  * Resource for booking slots and guest booking management.
@@ -627,6 +601,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature
    * @throws {NotFoundError} If the team does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.listGroups()` instead.
    */
   async listBookingGroups(teamId: string): Promise<TeamBookingGroup[]> {
     try {
@@ -650,6 +625,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature or admin role
    * @throws {NotFoundError} If the team does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.createGroup()` instead.
    */
   async createBookingGroup(teamId: string, data: CreateBookingGroupInput): Promise<TeamBookingGroup> {
     try {
@@ -673,6 +649,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature or admin role
    * @throws {NotFoundError} If the team or group does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.updateGroup()` instead.
    */
   async updateBookingGroup(
     teamId: string,
@@ -697,6 +674,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature or admin role
    * @throws {NotFoundError} If the team or group does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.deleteGroup()` instead.
    */
   async deleteBookingGroup(teamId: string, groupId: string): Promise<void> {
     try {
@@ -716,6 +694,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature
    * @throws {NotFoundError} If the team or group does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.listMembers()` instead.
    */
   async listGroupMembers(teamId: string, groupId: string): Promise<TeamBookingGroupMember[]> {
     try {
@@ -741,6 +720,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature or admin role
    * @throws {NotFoundError} If the team, group, or user does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.addMember()` instead.
    */
   async addGroupMember(
     teamId: string,
@@ -766,6 +746,7 @@ export class BookingResource {
    * @throws {AuthorizationError} If the user lacks the calendarBookingAdvanced feature or admin role
    * @throws {NotFoundError} If the team, group, or member does not exist
    * @throws {NetworkError} If the request fails due to network issues
+   * @deprecated Use `client.teamBookingGroups.removeMember()` instead.
    */
   async removeGroupMember(teamId: string, groupId: string, userId: string): Promise<void> {
     try {

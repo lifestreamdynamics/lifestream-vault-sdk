@@ -19,6 +19,11 @@ import { CustomDomainsResource } from './resources/custom-domains.js';
 import { AnalyticsResource } from './resources/analytics.js';
 import { PublishVaultResource } from './resources/publish-vault.js';
 import { BookingResource } from './resources/booking.js';
+import { TeamBookingGroupsResource } from './resources/team-booking-groups.js';
+import { SamlResource } from './resources/saml.js';
+import { ScimResource } from './resources/scim.js';
+import { PluginsResource } from './resources/plugins.js';
+import { CollaborationResource } from './resources/collaboration.js';
 import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
@@ -56,6 +61,8 @@ export interface ClientOptions {
   enableAuditLogging?: boolean;
   /** Path to the audit log file. Defaults to `~/.lsvault/audit.log`. */
   auditLogPath?: string;
+  /** SCIM Bearer token. When provided, enables the `scim` resource for user provisioning. */
+  scimToken?: string;
 }
 
 /**
@@ -71,7 +78,10 @@ export interface ClientOptions {
  * {@link HooksResource | hooks}, {@link WebhooksResource | webhooks},
  * {@link MfaResource | mfa}, {@link CalendarResource | calendar},
  * {@link CustomDomainsResource | customDomains}, {@link AnalyticsResource | analytics},
- * {@link PublishVaultResource | publishVault}, and {@link BookingResource | booking}.
+ * {@link PublishVaultResource | publishVault}, {@link BookingResource | booking},
+ * {@link TeamBookingGroupsResource | teamBookingGroups},
+ * {@link SamlResource | saml}, {@link ScimResource | scim},
+ * {@link PluginsResource | plugins}, and {@link CollaborationResource | collaboration}.
  *
  * When `baseUrl` is omitted, it defaults to `'https://vault.lifestreamdynamics.com'`.
  *
@@ -142,6 +152,16 @@ export class LifestreamVaultClient {
   readonly publishVault: PublishVaultResource;
   /** Booking slot and guest booking management. */
   readonly booking: BookingResource;
+  /** Team booking group management (Business tier). */
+  readonly teamBookingGroups: TeamBookingGroupsResource;
+  /** SAML SSO configuration management and metadata retrieval. */
+  readonly saml: SamlResource;
+  /** SCIM 2.0 user provisioning (null when no scimToken is configured). */
+  readonly scim: ScimResource | null;
+  /** Plugin/extension marketplace management. */
+  readonly plugins: PluginsResource;
+  /** Real-time collaborative editing WebSocket URL builder. */
+  readonly collaboration: CollaborationResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
 
@@ -329,6 +349,22 @@ export class LifestreamVaultClient {
     this.analytics = new AnalyticsResource(this.http);
     this.publishVault = new PublishVaultResource(this.http);
     this.booking = new BookingResource(this.http);
+    this.teamBookingGroups = new TeamBookingGroupsResource(this.http);
+    this.saml = new SamlResource(this.http, this.baseUrl);
+
+    if (options.scimToken) {
+      const scimHttp = ky.create({
+        prefixUrl: `${this.baseUrl}/api/v1/scim/v2`,
+        timeout,
+        headers: { 'Authorization': `Bearer ${options.scimToken}` },
+      });
+      this.scim = new ScimResource(scimHttp);
+    } else {
+      this.scim = null;
+    }
+
+    this.plugins = new PluginsResource(this.http);
+    this.collaboration = new CollaborationResource(this.baseUrl);
   }
 
   /**
