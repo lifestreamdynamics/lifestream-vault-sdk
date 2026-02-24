@@ -345,4 +345,146 @@ describe('DocumentsResource', () => {
       expect(result.created).toBe(false);
     });
   });
+
+  describe('listAll', () => {
+    it('should yield all documents when results are fewer than pageSize', async () => {
+      const docs = [
+        { path: 'notes/a.md', title: 'A', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+        { path: 'notes/b.md', title: 'B', tags: [], sizeBytes: 200, fileModifiedAt: '2024-01-02' },
+      ];
+      mockJsonResponse(kyMock.get, { documents: docs });
+
+      const results: unknown[] = [];
+      for await (const doc of resource.listAll('v1')) {
+        results.push(doc);
+      }
+
+      expect(results).toEqual(docs);
+      expect(kyMock.get).toHaveBeenCalledTimes(1);
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', {
+        searchParams: { limit: 100, offset: 0 },
+      });
+    });
+
+    it('should page through results until fewer than pageSize are returned', async () => {
+      const page1 = [
+        { path: 'a.md', title: 'A', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+        { path: 'b.md', title: 'B', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+      ];
+      const page2 = [
+        { path: 'c.md', title: 'C', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+      ];
+
+      kyMock.get
+        .mockReturnValueOnce({ json: async () => ({ documents: page1 }) })
+        .mockReturnValueOnce({ json: async () => ({ documents: page2 }) });
+
+      const results: unknown[] = [];
+      for await (const doc of resource.listAll('v1', undefined, 2)) {
+        results.push(doc);
+      }
+
+      expect(results).toHaveLength(3);
+      expect(kyMock.get).toHaveBeenCalledTimes(2);
+      expect(kyMock.get).toHaveBeenNthCalledWith(1, 'vaults/v1/documents', {
+        searchParams: { limit: 2, offset: 0 },
+      });
+      expect(kyMock.get).toHaveBeenNthCalledWith(2, 'vaults/v1/documents', {
+        searchParams: { limit: 2, offset: 2 },
+      });
+    });
+
+    it('should pass dirPath as dir search param', async () => {
+      mockJsonResponse(kyMock.get, { documents: [] });
+
+      const results: unknown[] = [];
+      for await (const doc of resource.listAll('v1', 'notes/')) {
+        results.push(doc);
+      }
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', {
+        searchParams: { limit: 100, offset: 0, dir: 'notes/' },
+      });
+      expect(results).toHaveLength(0);
+    });
+  });
+
+  describe('putMany', () => {
+    it('should write multiple documents and return succeeded paths', async () => {
+      const mockDoc = {
+        id: 'd1', vaultId: 'v1', path: 'a.md', title: 'A', contentHash: 'abc',
+        sizeBytes: 10, tags: [], encrypted: false, encryptionAlgorithm: null,
+        fileModifiedAt: '2024-01-01', createdAt: '2024-01-01', updatedAt: '2024-01-01',
+      };
+      mockJsonResponse(kyMock.put, mockDoc);
+
+      const result = await resource.putMany('v1', [
+        { path: 'a.md', content: '# A' },
+        { path: 'b.md', content: '# B' },
+      ]);
+
+      expect(result.succeeded).toEqual(['a.md', 'b.md']);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should report failed documents when put throws', async () => {
+      const mockDoc = {
+        id: 'd1', vaultId: 'v1', path: 'a.md', title: 'A', contentHash: 'abc',
+        sizeBytes: 10, tags: [], encrypted: false, encryptionAlgorithm: null,
+        fileModifiedAt: '2024-01-01', createdAt: '2024-01-01', updatedAt: '2024-01-01',
+      };
+      // The second put call will fail — handleError converts generic errors to NetworkError
+      kyMock.put
+        .mockReturnValueOnce({ json: async () => mockDoc })
+        .mockReturnValueOnce({ json: async () => { throw new Error('Network error'); } });
+
+      const result = await resource.putMany('v1', [
+        { path: 'a.md', content: '# A' },
+        { path: 'b.md', content: '# B' },
+      ]);
+
+      expect(result.succeeded).toEqual(['a.md']);
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].path).toBe('b.md');
+      // handleError wraps generic errors as NetworkError('Network request failed')
+      expect(result.failed[0].error).toContain('Network request failed');
+    });
+
+    it('should return empty succeeded and failed arrays for empty input', async () => {
+      const result = await resource.putMany('v1', []);
+
+      expect(result.succeeded).toEqual([]);
+      expect(result.failed).toEqual([]);
+    });
+  });
+
+  describe('deleteMany', () => {
+    it('should delegate to bulkDelete with the given paths', async () => {
+      const mockResult = {
+        succeeded: ['old/a.md', 'old/b.md'],
+        failed: [],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.deleteMany('v1', ['old/a.md', 'old/b.md']);
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-delete', {
+        json: { paths: ['old/a.md', 'old/b.md'] },
+      });
+      expect(result.succeeded).toEqual(['old/a.md', 'old/b.md']);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should return failed paths from bulkDelete response', async () => {
+      const mockResult = {
+        succeeded: ['old/a.md'],
+        failed: [{ path: 'old/missing.md', error: 'Not found' }],
+      };
+      mockJsonResponse(kyMock.post, mockResult);
+
+      const result = await resource.deleteMany('v1', ['old/a.md', 'old/missing.md']);
+
+      expect(result.failed[0].path).toBe('old/missing.md');
+    });
+  });
 });

@@ -119,4 +119,26 @@ export class SearchResource {
       throw await handleError(error, 'Search', params.q);
     }
   }
+
+  /**
+   * Async generator that yields all search results, automatically handling pagination.
+   *
+   * @param params - Search parameters (same as search(), excluding offset)
+   * @param pageSize - Number of results per page (default: 50)
+   * @yields SearchResult objects
+   */
+  async *searchAll(
+    params: { q: string; vault?: string; tags?: string; mode?: 'text' | 'semantic' | 'hybrid' },
+    pageSize = 50,
+  ): AsyncGenerator<SearchResult> {
+    let offset = 0;
+    while (true) {
+      const results = await this.search({ ...params, limit: pageSize, offset });
+      for (const result of results.results) {
+        yield result;
+      }
+      if (results.results.length < pageSize) break;
+      offset += pageSize;
+    }
+  }
 }

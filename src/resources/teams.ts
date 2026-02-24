@@ -1,7 +1,7 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
 import type { Vault } from '../types/index.js';
-import type { CalendarResponse, CalendarActivityResponse, CalendarEvent } from './calendar.js';
+import type { CalendarResponse, CalendarActivityResponse, CalendarEvent, UpcomingResponse, AgendaResponse, DueDocument } from './calendar.js';
 
 /** A team object returned by the API. */
 export interface Team {
@@ -469,29 +469,70 @@ export class TeamsResource {
 
   async getCalendar(teamId: string, params: { start: string; end: string; types?: string }): Promise<CalendarResponse> {
     try {
-      const searchParams = new URLSearchParams(params as Record<string, string>);
+      const searchParams: Record<string, string> = { start: params.start, end: params.end };
+      if (params.types) searchParams.types = params.types;
       return await this.http.get(`teams/${teamId}/calendar`, { searchParams }).json<CalendarResponse>();
     } catch (error) {
-      throw await handleError(error, 'Team', teamId);
+      throw await handleError(error, 'Team Calendar', teamId);
     }
   }
 
   async getCalendarActivity(teamId: string, params: { start: string; end: string }): Promise<CalendarActivityResponse> {
     try {
-      const searchParams = new URLSearchParams(params as Record<string, string>);
+      const searchParams: Record<string, string> = { start: params.start, end: params.end };
       return await this.http.get(`teams/${teamId}/calendar/activity`, { searchParams }).json<CalendarActivityResponse>();
     } catch (error) {
-      throw await handleError(error, 'Team', teamId);
+      throw await handleError(error, 'Team Calendar Activity', teamId);
     }
   }
 
   async getCalendarEvents(teamId: string, params?: { start?: string; end?: string }): Promise<CalendarEvent[]> {
     try {
-      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      const searchParams: Record<string, string> = {};
+      if (params?.start) searchParams.start = params.start;
+      if (params?.end) searchParams.end = params.end;
       const data = await this.http.get(`teams/${teamId}/calendar/events`, { searchParams }).json<{ events: CalendarEvent[] }>();
       return data.events;
     } catch (error) {
-      throw await handleError(error, 'Team', teamId);
+      throw await handleError(error, 'Team Calendar Events', teamId);
+    }
+  }
+
+  async getUpcoming(teamId: string): Promise<UpcomingResponse> {
+    try {
+      return await this.http.get(`teams/${teamId}/calendar/upcoming`).json<UpcomingResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Team Upcoming', teamId);
+    }
+  }
+
+  async getDue(teamId: string, params?: { status?: 'overdue' | 'upcoming' | 'all' }): Promise<DueDocument[]> {
+    try {
+      const searchParams: Record<string, string> = {};
+      if (params?.status) searchParams.status = params.status;
+      const data = await this.http.get(`teams/${teamId}/calendar/due`, { searchParams }).json<{ dueDocs: DueDocument[] }>();
+      return data.dueDocs;
+    } catch (error) {
+      throw await handleError(error, 'Team Due Documents', teamId);
+    }
+  }
+
+  async getAgenda(teamId: string, params?: { range?: string; groupBy?: string }): Promise<AgendaResponse> {
+    try {
+      const searchParams: Record<string, string> = {};
+      if (params?.range) searchParams.range = params.range;
+      if (params?.groupBy) searchParams.groupBy = params.groupBy;
+      return await this.http.get(`teams/${teamId}/calendar/agenda`, { searchParams }).json<AgendaResponse>();
+    } catch (error) {
+      throw await handleError(error, 'Team Agenda', teamId);
+    }
+  }
+
+  async getICalFeed(teamId: string): Promise<string> {
+    try {
+      return await this.http.get(`teams/${teamId}/calendar/feed.ics`).text();
+    } catch (error) {
+      throw await handleError(error, 'Team iCal Feed', teamId);
     }
   }
 }

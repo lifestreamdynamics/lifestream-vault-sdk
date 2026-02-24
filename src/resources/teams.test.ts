@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { TeamsResource } from './teams.js';
-import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, type KyMock } from '../__tests__/mocks/ky.js';
+import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, mockTextResponse, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError, NotFoundError, AuthorizationError, ValidationError } from '../errors.js';
 
 describe('TeamsResource', () => {
@@ -379,7 +379,7 @@ describe('TeamsResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'teams/t1/calendar',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { start: '2024-01-01', end: '2024-01-31' } }),
       );
       expect(result.start).toBe('2024-01-01');
       expect(result.end).toBe('2024-01-31');
@@ -393,7 +393,7 @@ describe('TeamsResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'teams/t1/calendar',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { start: '2024-01-01', end: '2024-01-31', types: 'events,due' } }),
       );
     });
 
@@ -419,7 +419,7 @@ describe('TeamsResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'teams/t1/calendar/activity',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { start: '2024-01-01', end: '2024-01-31' } }),
       );
       expect(result.days).toHaveLength(1);
       expect(result.days[0].total).toBe(3);
@@ -437,7 +437,7 @@ describe('TeamsResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'teams/t1/calendar/events',
-        expect.objectContaining({ searchParams: undefined }),
+        expect.objectContaining({ searchParams: {} }),
       );
       expect(result).toEqual(mockEvents);
     });
@@ -449,7 +449,7 @@ describe('TeamsResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'teams/t1/calendar/events',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { start: '2024-01-01', end: '2024-01-31' } }),
       );
     });
 
@@ -459,6 +459,149 @@ describe('TeamsResource', () => {
       const result = await resource.getCalendarEvents('t1');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getUpcoming', () => {
+    it('should GET teams/t1/calendar/upcoming and return upcoming response', async () => {
+      const mockResponse = {
+        events: [
+          { id: 'e1', vaultId: 'v1', userId: 'u1', title: 'Sprint Review', startDate: '2024-02-01', allDay: false, completed: false, createdAt: '2024-01-01', updatedAt: '2024-01-01' },
+        ],
+        dueDocs: [
+          { documentId: 'd1', path: 'notes/task.md', title: 'Task', dueAt: '2024-02-02', completed: false, overdue: false },
+        ],
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getUpcoming('t1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('teams/t1/calendar/upcoming');
+      expect(result.events).toHaveLength(1);
+      expect(result.dueDocs).toHaveLength(1);
+      expect(result.events[0].title).toBe('Sprint Review');
+    });
+
+    it('should return empty events and dueDocs when none exist', async () => {
+      mockJsonResponse(kyMock.get, { events: [], dueDocs: [] });
+
+      const result = await resource.getUpcoming('t1');
+
+      expect(result.events).toEqual([]);
+      expect(result.dueDocs).toEqual([]);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getUpcoming('t1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('getDue', () => {
+    it('should GET teams/t1/calendar/due and unwrap dueDocs', async () => {
+      const mockDueDocs = [
+        { documentId: 'd1', path: 'notes/overdue.md', title: 'Overdue Task', dueAt: '2024-01-01', completed: false, overdue: true },
+      ];
+      mockJsonResponse(kyMock.get, { dueDocs: mockDueDocs });
+
+      const result = await resource.getDue('t1');
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/due',
+        expect.objectContaining({ searchParams: expect.objectContaining({}) }),
+      );
+      expect(result).toEqual(mockDueDocs);
+    });
+
+    it('should pass status=overdue filter when provided', async () => {
+      mockJsonResponse(kyMock.get, { dueDocs: [] });
+
+      await resource.getDue('t1', { status: 'overdue' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/due',
+        expect.objectContaining({ searchParams: expect.objectContaining({ status: 'overdue' }) }),
+      );
+    });
+
+    it('should return empty array when no due documents', async () => {
+      mockJsonResponse(kyMock.get, { dueDocs: [] });
+
+      const result = await resource.getDue('t1');
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('getAgenda', () => {
+    it('should GET teams/t1/calendar/agenda and return agenda response', async () => {
+      const mockResponse = {
+        groups: [
+          { label: 'Today', items: [{ documentId: 'd1', path: 'notes/task.md', dueAt: '2024-02-01', completed: false, overdue: false }] },
+        ],
+        total: 1,
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const result = await resource.getAgenda('t1');
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/agenda',
+        expect.objectContaining({ searchParams: expect.objectContaining({}) }),
+      );
+      expect(result.groups).toHaveLength(1);
+      expect(result.total).toBe(1);
+    });
+
+    it('should pass range and groupBy params when provided', async () => {
+      mockJsonResponse(kyMock.get, { groups: [], total: 0 });
+
+      await resource.getAgenda('t1', { range: '7', groupBy: 'day' });
+
+      expect(kyMock.get).toHaveBeenCalledWith(
+        'teams/t1/calendar/agenda',
+        expect.objectContaining({
+          searchParams: expect.objectContaining({ range: '7', groupBy: 'day' }),
+        }),
+      );
+    });
+
+    it('should return empty groups when no agenda items', async () => {
+      mockJsonResponse(kyMock.get, { groups: [], total: 0 });
+
+      const result = await resource.getAgenda('t1');
+
+      expect(result.groups).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('getICalFeed', () => {
+    it('should GET teams/t1/calendar/feed.ics and return text', async () => {
+      const icalText = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR';
+      mockTextResponse(kyMock.get, icalText);
+
+      const result = await resource.getICalFeed('t1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('teams/t1/calendar/feed.ics');
+      expect(result).toBe(icalText);
+      expect(typeof result).toBe('string');
+    });
+
+    it('should return iCal text without JSON parsing', async () => {
+      mockTextResponse(kyMock.get, 'BEGIN:VCALENDAR\r\nEND:VCALENDAR');
+
+      const result = await resource.getICalFeed('t1');
+
+      expect(result).toContain('BEGIN:VCALENDAR');
+      expect(result).toContain('END:VCALENDAR');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getICalFeed('t1')).rejects.toBeInstanceOf(NetworkError);
     });
   });
 });

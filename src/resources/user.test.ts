@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UserResource } from './user.js';
-import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, type KyMock } from '../__tests__/mocks/ky.js';
+import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, mockBlobResponse, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError, AuthenticationError, NotFoundError } from '../errors.js';
 
 describe('UserResource', () => {
@@ -261,6 +261,76 @@ describe('UserResource', () => {
       mockHTTPError(kyMock.post, 404, { message: 'Invitation not found' });
 
       await expect(resource.acceptTeamInvitation('nonexistent')).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('listDataExports', () => {
+    it('should GET account/export and return array of export records', async () => {
+      const exports = [
+        { id: 'exp1', status: 'complete' as const, format: 'zip', createdAt: '2024-01-01', completedAt: '2024-01-01' },
+        { id: 'exp2', status: 'pending' as const, format: 'zip', createdAt: '2024-01-02' },
+      ];
+      mockJsonResponse(kyMock.get, { exports });
+
+      const result = await resource.listDataExports();
+
+      expect(kyMock.get).toHaveBeenCalledWith('account/export');
+      expect(result).toEqual(exports);
+      expect(result).toHaveLength(2);
+    });
+
+    it('should return empty array when no exports exist', async () => {
+      mockJsonResponse(kyMock.get, { exports: [] });
+
+      const result = await resource.listDataExports();
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw AuthenticationError on 401', async () => {
+      mockHTTPError(kyMock.get, 401, { message: 'Unauthorized' });
+
+      await expect(resource.listDataExports()).rejects.toBeInstanceOf(AuthenticationError);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.listDataExports()).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('downloadDataExport', () => {
+    it('should GET account/export/exp1/download and return a Blob', async () => {
+      const blob = new Blob(['zip content'], { type: 'application/zip' });
+      mockBlobResponse(kyMock.get, blob);
+
+      const result = await resource.downloadDataExport('exp1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('account/export/exp1/download');
+      expect(result).toBeInstanceOf(Blob);
+    });
+
+    it('should return a non-empty blob', async () => {
+      const content = 'zip file content here';
+      const blob = new Blob([content], { type: 'application/zip' });
+      mockBlobResponse(kyMock.get, blob);
+
+      const result = await resource.downloadDataExport('exp1');
+
+      expect(result.size).toBeGreaterThan(0);
+    });
+
+    it('should throw NotFoundError when export does not exist', async () => {
+      mockHTTPError(kyMock.get, 404, { message: 'Export not found' });
+
+      await expect(resource.downloadDataExport('nonexistent')).rejects.toBeInstanceOf(NotFoundError);
+    });
+
+    it('should throw AuthenticationError on 401', async () => {
+      mockHTTPError(kyMock.get, 401, { message: 'Unauthorized' });
+
+      await expect(resource.downloadDataExport('exp1')).rejects.toBeInstanceOf(AuthenticationError);
     });
   });
 });

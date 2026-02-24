@@ -9,6 +9,7 @@ export function createKyMock() {
   const createResponse = (data: unknown = undefined) => ({
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(''),
+    blob: vi.fn().mockResolvedValue(new Blob()),
     ok: true,
     status: 200,
   });
@@ -35,6 +36,33 @@ export function mockJsonResponse(method: ReturnType<typeof vi.fn>, data: unknown
   method.mockReturnValue({
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+    blob: vi.fn().mockResolvedValue(new Blob([JSON.stringify(data)])),
+    ok: true,
+    status: 200,
+  });
+}
+
+/**
+ * Helper to make a ky mock method return a plain text response.
+ */
+export function mockTextResponse(method: ReturnType<typeof vi.fn>, text: string) {
+  method.mockReturnValue({
+    json: vi.fn().mockRejectedValue(new Error('Not JSON')),
+    text: vi.fn().mockResolvedValue(text),
+    blob: vi.fn().mockResolvedValue(new Blob([text])),
+    ok: true,
+    status: 200,
+  });
+}
+
+/**
+ * Helper to make a ky mock method return a blob response.
+ */
+export function mockBlobResponse(method: ReturnType<typeof vi.fn>, blob: Blob) {
+  method.mockReturnValue({
+    json: vi.fn().mockRejectedValue(new Error('Not JSON')),
+    text: vi.fn().mockResolvedValue(''),
+    blob: vi.fn().mockResolvedValue(blob),
     ok: true,
     status: 200,
   });
@@ -62,6 +90,7 @@ export function mockHTTPError(method: ReturnType<typeof vi.fn>, status: number, 
   method.mockReturnValue({
     json: vi.fn().mockRejectedValue(error),
     text: vi.fn().mockRejectedValue(error),
+    blob: vi.fn().mockRejectedValue(error),
     ok: false,
     // For methods that don't call .json() (e.g., delete), also reject the thenable
     then: (_resolve: unknown, reject: (e: HTTPError) => void) => Promise.reject(error).then(undefined, reject),
@@ -77,6 +106,7 @@ export function mockNetworkError(method: ReturnType<typeof vi.fn>, error?: Error
   method.mockReturnValue({
     json: vi.fn().mockRejectedValue(err),
     text: vi.fn().mockRejectedValue(err),
+    blob: vi.fn().mockRejectedValue(err),
     ok: false,
     then: (_resolve: unknown, reject: (e: Error) => void) => Promise.reject(err).then(undefined, reject),
   });

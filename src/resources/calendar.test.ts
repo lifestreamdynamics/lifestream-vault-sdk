@@ -228,7 +228,7 @@ describe('CalendarResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'vaults/vault-1/calendar/feed.ics',
-        expect.objectContaining({ searchParams: undefined }),
+        expect.objectContaining({ searchParams: {} }),
       );
       expect(result).toBe(icalContent);
     });
@@ -246,7 +246,7 @@ describe('CalendarResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'vaults/vault-1/calendar/feed.ics',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { include: 'events,due' } }),
       );
     });
 
@@ -272,7 +272,7 @@ describe('CalendarResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'vaults/vault-1/calendar/agenda',
-        expect.objectContaining({ searchParams: undefined }),
+        expect.objectContaining({ searchParams: {} }),
       );
       expect(result.total).toBe(1);
       expect(result.groups).toHaveLength(2);
@@ -286,7 +286,7 @@ describe('CalendarResource', () => {
 
       expect(kyMock.get).toHaveBeenCalledWith(
         'vaults/vault-1/calendar/agenda',
-        expect.objectContaining({ searchParams: expect.any(URLSearchParams) }),
+        expect.objectContaining({ searchParams: { status: 'overdue', range: '7d', groupBy: 'priority' } }),
       );
     });
 
@@ -298,6 +298,185 @@ describe('CalendarResource', () => {
 
       expect(result.total).toBe(0);
       expect(result.groups).toEqual([]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Calendar connector OAuth methods
+  // ---------------------------------------------------------------------------
+
+  describe('connectGoogleCalendar', () => {
+    it('should POST to the google connect endpoint and return authUrl', async () => {
+      const mockResponse = { authUrl: 'https://accounts.google.com/o/oauth2/auth?...' };
+      mockJsonResponse(kyMock.post, mockResponse);
+
+      const result = await resource.connectGoogleCalendar('v1');
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/calendar-connectors/google/connect');
+      expect(result).toEqual(mockResponse);
+      expect(result.authUrl).toBe('https://accounts.google.com/o/oauth2/auth?...');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(resource.connectGoogleCalendar('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('connectOutlookCalendar', () => {
+    it('should POST to the outlook connect endpoint and return authUrl', async () => {
+      const mockResponse = { authUrl: 'https://login.microsoftonline.com/oauth2/authorize?...' };
+      mockJsonResponse(kyMock.post, mockResponse);
+
+      const result = await resource.connectOutlookCalendar('v1');
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/calendar-connectors/outlook/connect');
+      expect(result).toEqual(mockResponse);
+      expect(result.authUrl).toBe('https://login.microsoftonline.com/oauth2/authorize?...');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(resource.connectOutlookCalendar('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Event template methods
+  // ---------------------------------------------------------------------------
+
+  describe('listTemplates', () => {
+    it('should GET templates and return the templates array', async () => {
+      const mockTemplates = [
+        {
+          id: 'tmpl-1',
+          vaultId: 'v1',
+          userId: 'u1',
+          name: 'Daily Standup',
+          duration: 15,
+          createdAt: '2024-01-01',
+          updatedAt: '2024-01-01',
+        },
+      ];
+      mockJsonResponse(kyMock.get, { templates: mockTemplates });
+
+      const result = await resource.listTemplates('v1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/calendar/templates');
+      expect(result).toEqual(mockTemplates);
+    });
+
+    it('should return empty array when no templates exist', async () => {
+      mockJsonResponse(kyMock.get, { templates: [] });
+
+      const result = await resource.listTemplates('v1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.listTemplates('v1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('createTemplate', () => {
+    it('should POST with json body and return the created template', async () => {
+      const input = { name: 'Sprint Planning', duration: 60, color: '#3b82f6' };
+      const mockResponse = {
+        id: 'tmpl-2',
+        vaultId: 'v1',
+        userId: 'u1',
+        ...input,
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01',
+      };
+      mockJsonResponse(kyMock.post, mockResponse);
+
+      const result = await resource.createTemplate('v1', input);
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/calendar/templates', { json: input });
+      expect(result).toEqual(mockResponse);
+      expect(result.name).toBe('Sprint Planning');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(resource.createTemplate('v1', { name: 'T', duration: 30 })).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('getTemplate', () => {
+    it('should GET a template by id', async () => {
+      const mockTemplate = {
+        id: 'tmpl-1',
+        vaultId: 'v1',
+        userId: 'u1',
+        name: 'Daily Standup',
+        duration: 15,
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-01',
+      };
+      mockJsonResponse(kyMock.get, mockTemplate);
+
+      const result = await resource.getTemplate('v1', 'tmpl-1');
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/calendar/templates/tmpl-1');
+      expect(result).toEqual(mockTemplate);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.get);
+
+      await expect(resource.getTemplate('v1', 'tmpl-1')).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('updateTemplate', () => {
+    it('should PUT with json body and return the updated template', async () => {
+      const updateData = { name: 'Updated Standup', duration: 20 };
+      const mockResponse = {
+        id: 'tmpl-1',
+        vaultId: 'v1',
+        userId: 'u1',
+        name: 'Updated Standup',
+        duration: 20,
+        createdAt: '2024-01-01',
+        updatedAt: '2024-01-02',
+      };
+      mockJsonResponse(kyMock.put, mockResponse);
+
+      const result = await resource.updateTemplate('v1', 'tmpl-1', updateData);
+
+      expect(kyMock.put).toHaveBeenCalledWith('vaults/v1/calendar/templates/tmpl-1', { json: updateData });
+      expect(result).toEqual(mockResponse);
+      expect(result.duration).toBe(20);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.put);
+
+      await expect(resource.updateTemplate('v1', 'tmpl-1', { name: 'X' })).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('deleteTemplate', () => {
+    it('should DELETE the template at the correct URL', async () => {
+      mockJsonResponse(kyMock.delete, undefined);
+
+      await resource.deleteTemplate('v1', 'tmpl-1');
+
+      expect(kyMock.delete).toHaveBeenCalledWith('vaults/v1/calendar/templates/tmpl-1');
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.delete);
+
+      await expect(resource.deleteTemplate('v1', 'tmpl-1')).rejects.toBeInstanceOf(NetworkError);
     });
   });
 

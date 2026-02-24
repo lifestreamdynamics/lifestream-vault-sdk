@@ -387,4 +387,19 @@ export class VaultsResource {
       throw await handleError(error, 'Vault', vaultId);
     }
   }
+
+  /**
+   * Async generator that yields all vaults, automatically handling pagination.
+   *
+   * Note: The vaults list endpoint doesn't paginate today, so this yields all
+   * results in a single batch. It exists for API consistency with other listAll() methods.
+   *
+   * @yields Vault objects
+   */
+  async *listAll(): AsyncGenerator<Vault> {
+    const vaults = await this.list();
+    for (const vault of vaults) {
+      yield vault;
+    }
+  }
 }

@@ -111,4 +111,76 @@ describe('SearchResource', () => {
       await expect(resource.search({ q: 'fail' })).rejects.toThrow('Network request failed');
     });
   });
+
+  describe('searchAll', () => {
+    it('should yield all results when fewer than pageSize are returned', async () => {
+      const mockResponse = {
+        results: [
+          {
+            documentId: 'd1', vaultId: 'v1', vaultName: 'Main', path: 'hello.md',
+            title: 'Hello', snippet: '...match...', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01',
+          },
+          {
+            documentId: 'd2', vaultId: 'v1', vaultName: 'Main', path: 'world.md',
+            title: 'World', snippet: '...other...', tags: [], rank: 0.8, fileModifiedAt: '2024-01-02',
+          },
+        ],
+        total: 2,
+        query: 'hello',
+      };
+      mockJsonResponse(kyMock.get, mockResponse);
+
+      const results: unknown[] = [];
+      for await (const result of resource.searchAll({ q: 'hello' })) {
+        results.push(result);
+      }
+
+      expect(results).toHaveLength(2);
+      expect(results).toEqual(mockResponse.results);
+      expect(kyMock.get).toHaveBeenCalledTimes(1);
+    });
+
+    it('should page through results until fewer than pageSize are returned', async () => {
+      const page1Result = {
+        results: [
+          { documentId: 'd1', vaultId: 'v1', vaultName: 'Main', path: 'a.md', title: 'A', snippet: '', tags: [], rank: 1.0, fileModifiedAt: '2024-01-01' },
+          { documentId: 'd2', vaultId: 'v1', vaultName: 'Main', path: 'b.md', title: 'B', snippet: '', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01' },
+        ],
+        total: 3,
+        query: 'test',
+      };
+      const page2Result = {
+        results: [
+          { documentId: 'd3', vaultId: 'v1', vaultName: 'Main', path: 'c.md', title: 'C', snippet: '', tags: [], rank: 0.8, fileModifiedAt: '2024-01-01' },
+        ],
+        total: 3,
+        query: 'test',
+      };
+
+      kyMock.get
+        .mockReturnValueOnce({ json: async () => page1Result })
+        .mockReturnValueOnce({ json: async () => page2Result });
+
+      const results: unknown[] = [];
+      for await (const result of resource.searchAll({ q: 'test' }, 2)) {
+        results.push(result);
+      }
+
+      expect(results).toHaveLength(3);
+      expect(kyMock.get).toHaveBeenCalledTimes(2);
+    });
+
+    it('should pass vault and tags filters through to each page request', async () => {
+      mockJsonResponse(kyMock.get, { results: [], total: 0, query: 'filtered' });
+
+      const results: unknown[] = [];
+      for await (const result of resource.searchAll({ q: 'filtered', vault: 'v2', tags: 'tag1' })) {
+        results.push(result);
+      }
+
+      expect(kyMock.get).toHaveBeenCalledWith('search', expect.objectContaining({
+        searchParams: expect.objectContaining({ q: 'filtered', vault: 'v2', tags: 'tag1' }),
+      }));
+    });
+  });
 });

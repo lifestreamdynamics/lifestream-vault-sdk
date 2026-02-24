@@ -347,6 +347,37 @@ export class UserResource {
   }
 
   /**
+   * Lists all data export records for the authenticated user.
+   *
+   * @returns Array of data export records
+   * @throws {AuthenticationError} If not authenticated
+   */
+  async listDataExports(): Promise<DataExportRecord[]> {
+    try {
+      const data = await this.http.get('account/export').json<{ exports: DataExportRecord[] }>();
+      return data.exports;
+    } catch (error) {
+      throw await handleError(error, 'User', '');
+    }
+  }
+
+  /**
+   * Downloads a completed data export file.
+   *
+   * @param exportId - ID of the export to download
+   * @returns The export file as a Blob
+   * @throws {NotFoundError} If the export does not exist or is not complete
+   * @throws {AuthenticationError} If not authenticated
+   */
+  async downloadDataExport(exportId: string): Promise<Blob> {
+    try {
+      return await this.http.get(`account/export/${exportId}/download`).blob();
+    } catch (error) {
+      throw await handleError(error, 'User', exportId);
+    }
+  }
+
+  /**
    * Lists all consent records for the authenticated user.
    *
    * @returns Array of consent records (ToS, privacy policy, etc.)

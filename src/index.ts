@@ -1,8 +1,8 @@
 export { LifestreamVaultClient, DEFAULT_API_URL, type ClientOptions } from './client.js';
 export { VaultsResource } from './resources/vaults.js';
-export type { VaultTreeNode, VaultExportRecord, VaultMfaConfig } from './resources/vaults.js';
+export type { VaultTreeNode, VaultExportRecord, VaultMfaConfig, LinkGraphNode, LinkGraphEdge, LinkGraphResponse, UnresolvedLink, UnresolvedLinkReference } from './resources/vaults.js';
 export { DocumentsResource } from './resources/documents.js';
-export type { BulkOperationResult } from './resources/documents.js';
+export type { BulkOperationResult, DocumentVersion, DocumentVersionWithContent, VersionDiffResponse, ForwardLinkResult, BacklinkResult } from './resources/documents.js';
 export { SearchResource } from './resources/search.js';
 export { AiResource } from './resources/ai.js';
 export { ApiKeysResource } from './resources/api-keys.js';
@@ -67,6 +67,12 @@ export type {
   ICalTokenStatus,
   CalendarConnector,
   CalendarConnectorSyncResult,
+  EventParticipant,
+  RecurrenceRule,
+  CalendarEventTemplate,
+  CreateEventTemplateInput,
+  UpdateEventTemplateInput,
+  CalendarConnectorOAuthResult,
 } from './resources/calendar.js';
 export { BookingResource } from './resources/booking.js';
 export type {

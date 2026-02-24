@@ -93,6 +93,44 @@ export interface CreateCalendarEventInput {
   color?: string;
 }
 
+export interface CalendarEventTemplate {
+  id: string;
+  vaultId: string;
+  userId: string;
+  name: string;
+  description?: string;
+  duration: number;
+  location?: string;
+  color?: string;
+  defaultPriority?: string;
+  recurrenceRule?: RecurrenceRule;
+  metadata?: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEventTemplateInput {
+  name: string;
+  description?: string;
+  duration: number;
+  location?: string;
+  color?: string;
+  defaultPriority?: string;
+  recurrenceRule?: RecurrenceRule;
+  metadata?: unknown;
+}
+
+export interface UpdateEventTemplateInput {
+  name?: string;
+  description?: string;
+  duration?: number;
+  location?: string;
+  color?: string;
+  defaultPriority?: string;
+  recurrenceRule?: RecurrenceRule;
+  metadata?: unknown;
+}
+
 /**
  * Resource for calendar, activity, and due date operations.
  *
@@ -310,19 +348,23 @@ export class CalendarResource {
 
   async getIcalFeed(vaultId: string, params?: { include?: string }): Promise<string> {
     try {
-      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      const searchParams: Record<string, string> = {};
+      if (params?.include) searchParams.include = params.include;
       return await this.http.get(`vaults/${vaultId}/calendar/feed.ics`, { searchParams }).text();
     } catch (error) {
-      throw await handleError(error, 'Calendar', vaultId);
+      throw await handleError(error, 'iCal Feed', vaultId);
     }
   }
 
   async getAgenda(vaultId: string, params?: { status?: string; range?: string; groupBy?: string }): Promise<AgendaResponse> {
     try {
-      const searchParams = params ? new URLSearchParams(params as Record<string, string>) : undefined;
+      const searchParams: Record<string, string> = {};
+      if (params?.status) searchParams.status = params.status;
+      if (params?.range) searchParams.range = params.range;
+      if (params?.groupBy) searchParams.groupBy = params.groupBy;
       return await this.http.get(`vaults/${vaultId}/calendar/agenda`, { searchParams }).json<AgendaResponse>();
     } catch (error) {
-      throw await handleError(error, 'Calendar', vaultId);
+      throw await handleError(error, 'Calendar Agenda', vaultId);
     }
   }
 
@@ -460,7 +502,7 @@ export class CalendarResource {
    */
   async listConnectors(vaultId: string): Promise<CalendarConnector[]> {
     try {
-      return await this.http.get(`vaults/${vaultId}/calendar/connectors`).json<CalendarConnector[]>();
+      return await this.http.get(`vaults/${vaultId}/calendar-connectors`).json<CalendarConnector[]>();
     } catch (error) {
       throw await handleError(error, 'Calendar Connectors', vaultId);
     }
@@ -478,7 +520,7 @@ export class CalendarResource {
    */
   async disconnectConnector(vaultId: string, connectorId: string): Promise<void> {
     try {
-      await this.http.delete(`vaults/${vaultId}/calendar/connectors/${connectorId}`);
+      await this.http.delete(`vaults/${vaultId}/calendar-connectors/${connectorId}`);
     } catch (error) {
       throw await handleError(error, 'Disconnect Connector', connectorId);
     }
@@ -497,9 +539,25 @@ export class CalendarResource {
    */
   async syncConnector(vaultId: string, connectorId: string): Promise<CalendarConnectorSyncResult> {
     try {
-      return await this.http.post(`vaults/${vaultId}/calendar/connectors/${connectorId}/sync`).json<CalendarConnectorSyncResult>();
+      return await this.http.post(`vaults/${vaultId}/calendar-connectors/${connectorId}/sync`).json<CalendarConnectorSyncResult>();
     } catch (error) {
       throw await handleError(error, 'Sync Connector', connectorId);
+    }
+  }
+
+  async connectGoogleCalendar(vaultId: string): Promise<CalendarConnectorOAuthResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/calendar-connectors/google/connect`).json<CalendarConnectorOAuthResult>();
+    } catch (error) {
+      throw await handleError(error, 'Connect Google Calendar', vaultId);
+    }
+  }
+
+  async connectOutlookCalendar(vaultId: string): Promise<CalendarConnectorOAuthResult> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/calendar-connectors/outlook/connect`).json<CalendarConnectorOAuthResult>();
+    } catch (error) {
+      throw await handleError(error, 'Connect Outlook Calendar', vaultId);
     }
   }
 
@@ -611,6 +669,51 @@ export class CalendarResource {
       throw await handleError(error, 'Remove Participant', participantId);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Event templates (Pro tier)
+  // ---------------------------------------------------------------------------
+
+  async listTemplates(vaultId: string): Promise<CalendarEventTemplate[]> {
+    try {
+      const data = await this.http.get(`vaults/${vaultId}/calendar/templates`).json<{ templates: CalendarEventTemplate[] }>();
+      return data.templates;
+    } catch (error) {
+      throw await handleError(error, 'Event Templates', vaultId);
+    }
+  }
+
+  async createTemplate(vaultId: string, data: CreateEventTemplateInput): Promise<CalendarEventTemplate> {
+    try {
+      return await this.http.post(`vaults/${vaultId}/calendar/templates`, { json: data }).json<CalendarEventTemplate>();
+    } catch (error) {
+      throw await handleError(error, 'Create Template', data.name);
+    }
+  }
+
+  async getTemplate(vaultId: string, templateId: string): Promise<CalendarEventTemplate> {
+    try {
+      return await this.http.get(`vaults/${vaultId}/calendar/templates/${templateId}`).json<CalendarEventTemplate>();
+    } catch (error) {
+      throw await handleError(error, 'Event Template', templateId);
+    }
+  }
+
+  async updateTemplate(vaultId: string, templateId: string, data: UpdateEventTemplateInput): Promise<CalendarEventTemplate> {
+    try {
+      return await this.http.put(`vaults/${vaultId}/calendar/templates/${templateId}`, { json: data }).json<CalendarEventTemplate>();
+    } catch (error) {
+      throw await handleError(error, 'Update Template', templateId);
+    }
+  }
+
+  async deleteTemplate(vaultId: string, templateId: string): Promise<void> {
+    try {
+      await this.http.delete(`vaults/${vaultId}/calendar/templates/${templateId}`);
+    } catch (error) {
+      throw await handleError(error, 'Delete Template', templateId);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -660,6 +763,10 @@ export interface CalendarConnectorSyncResult {
   synced: number;
   errors: number;
   syncedAt: string;
+}
+
+export interface CalendarConnectorOAuthResult {
+  authUrl: string;
 }
 
 export interface EventParticipant {

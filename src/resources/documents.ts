@@ -570,4 +570,62 @@ export class DocumentsResource {
       throw await handleError(error, 'Document', vaultId);
     }
   }
+
+  /**
+   * Async generator that yields all documents in a vault, automatically handling pagination.
+   *
+   * @param vaultId - The vault ID to list documents from
+   * @param dirPath - Optional directory path filter
+   * @param pageSize - Number of documents per page (default: 100)
+   * @yields DocumentListItem objects
+   */
+  async *listAll(vaultId: string, dirPath?: string, pageSize = 100): AsyncGenerator<DocumentListItem> {
+    let offset = 0;
+    while (true) {
+      const searchParams: Record<string, string | number> = { limit: pageSize, offset };
+      if (dirPath) searchParams.dir = dirPath;
+      try {
+        const data = await this.http.get(`vaults/${vaultId}/documents`, { searchParams }).json<{ documents: DocumentListItem[] }>();
+        for (const doc of data.documents) {
+          yield doc;
+        }
+        if (data.documents.length < pageSize) break;
+        offset += pageSize;
+      } catch (error) {
+        throw await handleError(error, 'Documents', vaultId);
+      }
+    }
+  }
+
+  /**
+   * Creates or updates multiple documents sequentially.
+   *
+   * @param vaultId - The vault ID
+   * @param docs - Array of {path, content} objects to write
+   * @returns Result with succeeded paths and failed operations
+   */
+  async putMany(vaultId: string, docs: Array<{ path: string; content: string }>): Promise<BulkOperationResult> {
+    const succeeded: string[] = [];
+    const failed: Array<{ path: string; error: string }> = [];
+    for (const doc of docs) {
+      try {
+        await this.put(vaultId, doc.path, doc.content);
+        succeeded.push(doc.path);
+      } catch (error) {
+        failed.push({ path: doc.path, error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+    return { succeeded, failed };
+  }
+
+  /**
+   * Deletes multiple documents using the bulk delete API endpoint.
+   *
+   * @param vaultId - The vault ID
+   * @param paths - Array of document paths to delete
+   * @returns Result with succeeded and failed paths
+   */
+  async deleteMany(vaultId: string, paths: string[]): Promise<BulkOperationResult> {
+    return this.bulkDelete(vaultId, { paths });
+  }
 }

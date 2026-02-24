@@ -367,4 +367,46 @@ describe('VaultsResource', () => {
       expect(result.verified).toBe(true);
     });
   });
+
+  describe('listAll', () => {
+    it('should yield all vaults from list()', async () => {
+      const mockVaults = [
+        { id: 'v1', name: 'Vault One', slug: 'vault-one', description: null, encryptionEnabled: false, createdAt: '2024-01-01', updatedAt: '2024-01-01', isArchived: false, archivedAt: null, teamId: null, userId: 'u1', baseDir: null },
+        { id: 'v2', name: 'Vault Two', slug: 'vault-two', description: 'desc', encryptionEnabled: false, createdAt: '2024-01-01', updatedAt: '2024-01-01', isArchived: false, archivedAt: null, teamId: null, userId: 'u1', baseDir: null },
+      ];
+      mockJsonResponse(kyMock.get, { vaults: mockVaults });
+
+      const results: unknown[] = [];
+      for await (const vault of resource.listAll()) {
+        results.push(vault);
+      }
+
+      expect(results).toEqual(mockVaults);
+      expect(results).toHaveLength(2);
+      expect(kyMock.get).toHaveBeenCalledWith('vaults');
+    });
+
+    it('should yield nothing when no vaults exist', async () => {
+      mockJsonResponse(kyMock.get, { vaults: [] });
+
+      const results: unknown[] = [];
+      for await (const vault of resource.listAll()) {
+        results.push(vault);
+      }
+
+      expect(results).toHaveLength(0);
+    });
+
+    it('should make only one request to the vaults endpoint', async () => {
+      const mockVaults = [
+        { id: 'v1', name: 'Only One', slug: 'only-one', description: null, encryptionEnabled: false, createdAt: '2024-01-01', updatedAt: '2024-01-01', isArchived: false, archivedAt: null, teamId: null, userId: 'u1', baseDir: null },
+      ];
+      mockJsonResponse(kyMock.get, { vaults: mockVaults });
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      for await (const _vault of resource.listAll()) { /* consume */ }
+
+      expect(kyMock.get).toHaveBeenCalledTimes(1);
+    });
+  });
 });
