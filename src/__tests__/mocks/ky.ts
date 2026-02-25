@@ -9,7 +9,7 @@ export function createKyMock() {
   const createResponse = (data: unknown = undefined) => ({
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(''),
-    blob: vi.fn().mockResolvedValue(new Blob()),
+    blob: vi.fn().mockResolvedValue(new Blob([])),
     ok: true,
     status: 200,
   });

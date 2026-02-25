@@ -218,10 +218,9 @@ const vaults = await client.vaults.list();
 // Get a specific vault
 const vault = await client.vaults.get('vault-id');
 
-// Create a new vault
+// Create a new vault (slug is auto-generated from name)
 const newVault = await client.vaults.create({
   name: 'My Notes',
-  slug: 'my-notes', // Optional: auto-generated from name
   description: 'Personal notes and ideas',
   encryptionEnabled: false,
 });
@@ -264,14 +263,11 @@ console.log(doc.content); // Raw Markdown content
 // Create or update a document
 await client.documents.put('vault-id', 'new-doc.md', '# Hello World\n\nMy content');
 
-// Get document metadata only
-const metadata = await client.documents.getMetadata('vault-id', 'path/to/doc.md');
-
 // Delete a document
 await client.documents.delete('vault-id', 'path/to/doc.md');
 
 // Get directory tree structure
-const tree = await client.documents.tree('vault-id');
+const tree = await client.vaults.getTree('vault-id');
 
 // Get forward links from a document
 const links = await client.documents.getLinks('vault-id', 'notes/index.md');
@@ -624,7 +620,7 @@ const status = await client.mfa.getStatus();
 const setup = await client.mfa.setupTotp();
 
 // Verify and enable TOTP
-await client.mfa.verifyTotp({ token: '123456' });
+await client.mfa.verifyTotp('123456');
 
 // Register a passkey
 const registration = await client.mfa.startPasskeyRegistration();
@@ -690,11 +686,11 @@ await client.booking.rescheduleBooking('reschedule-token', '2026-04-15T10:00:00Z
 const analytics = await client.booking.getBookingAnalytics('vault-id', { view: 'volume' });
 
 // Team round-robin booking groups (Business tier)
-const group = await client.booking.createBookingGroup('team-id', {
+const group = await client.teamBookingGroups.createGroup('team-id', {
   name: 'Sales Team',
   assignmentMode: 'round_robin',
 });
-await client.booking.addGroupMember('team-id', group.id, { userId: 'user-id' });
+await client.teamBookingGroups.addMember('team-id', group.id, { userId: 'user-id' });
 ```
 
 ### Custom Domains
@@ -1096,7 +1092,7 @@ import {
 
 ```typescript
 try {
-  await client.vaults.create({ name: 'My Vault', slug: 'existing-slug' });
+  await client.vaults.create({ name: 'My Vault' });
 } catch (error) {
   if (error instanceof ConflictError) {
     console.error('A vault with this slug already exists');
@@ -1116,8 +1112,7 @@ All SDK errors include:
 
 ```typescript
 error.message    // Human-readable error message
-error.status     // HTTP status code (if applicable)
-error.context    // Additional error context (resource type, ID, etc.)
+error.statusCode // HTTP status code (if applicable)
 ```
 
 ### Retry Logic Example
@@ -1174,7 +1169,7 @@ import {
 // Compiler catches missing required fields
 const vault = await client.vaults.create({
   name: 'My Vault',
-  // slug is optional, auto-generated
+  // slug is auto-generated from name
   // TypeScript won't let you pass invalid fields
 });
 
@@ -1194,8 +1189,8 @@ try {
   await client.vaults.get('invalid-id');
 } catch (error) {
   if (error instanceof SDKError) {
-    // TypeScript knows about status, message, context
-    console.error(`Error ${error.status}: ${error.message}`);
+    // TypeScript knows about statusCode and message
+    console.error(`Error ${error.statusCode}: ${error.message}`);
   }
 }
 ```
