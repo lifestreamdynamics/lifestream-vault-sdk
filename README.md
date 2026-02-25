@@ -743,6 +743,137 @@ const sites = await client.publishVault.listMine();
 await client.publishVault.unpublish('vault-id');
 ```
 
+### Collaboration
+
+Real-time collaborative editing WebSocket URL builder. No HTTP calls are made.
+
+```typescript
+// Get a WebSocket URL for a collaborative editing session
+const wsUrl = client.collaboration.getWebSocketUrl('vault-id', 'docs/notes.md');
+// => 'wss://vault.lifestreamdynamics.com/collab/vault-id/docs/notes.md'
+
+const ws = new WebSocket(wsUrl);
+```
+
+### SAML SSO
+
+SAML SSO configuration management (admin only) and public login helpers. Requires Business tier.
+
+```typescript
+// List all SSO configurations (admin)
+const configs = await client.saml.listConfigs();
+
+// Create a new SSO config (admin)
+const config = await client.saml.createConfig({
+  domain: 'acmecorp.com',
+  slug: 'acmecorp',
+  entityId: 'https://idp.acmecorp.com/entity',
+  ssoUrl: 'https://idp.acmecorp.com/sso',
+  certificate: '-----BEGIN CERTIFICATE-----\n...',
+});
+
+// Update an SSO config (admin)
+await client.saml.updateConfig(config.id, { ssoUrl: 'https://new-idp.acmecorp.com/sso' });
+
+// Delete an SSO config (admin)
+await client.saml.deleteConfig(config.id);
+
+// Get SP metadata XML (public)
+const metadataXml = await client.saml.getMetadata('acmecorp');
+
+// Get IdP login redirect URL (pure URL builder, no HTTP call)
+const loginUrl = client.saml.getLoginUrl('acmecorp');
+```
+
+### SCIM
+
+SCIM 2.0 user provisioning. Available as `client.scim` (nullable — requires `scimToken` in client options). Requires Business tier.
+
+```typescript
+// List provisioned users (with optional filter and pagination)
+const result = await client.scim?.listUsers({ count: 50 });
+console.log(result?.totalResults);
+
+// Provision a new user
+const user = await client.scim?.createUser({
+  userName: 'jane@acmecorp.com',
+  name: { givenName: 'Jane', familyName: 'Doe' },
+  emails: [{ value: 'jane@acmecorp.com', primary: true }],
+  active: true,
+});
+
+// Update a user
+await client.scim?.updateUser(user!.id, { active: false });
+
+// Delete (deprovision) a user
+await client.scim?.deleteUser('user-id');
+
+// Get SCIM service provider configuration
+const spConfig = await client.scim?.getServiceProviderConfig();
+```
+
+### Plugins
+
+Plugin/extension marketplace management.
+
+```typescript
+// List installed plugins
+const plugins = await client.plugins.list();
+
+// Install a plugin
+const plugin = await client.plugins.install({
+  pluginId: 'org/my-plugin',
+  version: '1.0.0',
+});
+
+// Enable / disable
+await client.plugins.enable('org/my-plugin');
+await client.plugins.disable('org/my-plugin');
+
+// Update plugin-specific settings
+await client.plugins.updateSettings('org/my-plugin', {
+  theme: 'dark',
+  autoSync: true,
+});
+
+// Uninstall a plugin
+await client.plugins.uninstall('org/my-plugin');
+```
+
+### Team Booking Groups
+
+Team round-robin scheduling groups for distributing bookings among team members. Requires Business tier (`calendarBookingAdvanced` feature).
+
+```typescript
+// List booking groups for a team
+const groups = await client.teamBookingGroups.listGroups('team-id');
+
+// Create a booking group
+const group = await client.teamBookingGroups.createGroup('team-id', {
+  name: 'Support Rotation',
+  assignmentMode: 'round_robin', // or 'least_busy', 'attendee_choice'
+});
+
+// Update a group
+await client.teamBookingGroups.updateGroup('team-id', group.id, {
+  assignmentMode: 'least_busy',
+  isActive: true,
+});
+
+// Manage group members
+const members = await client.teamBookingGroups.listMembers('team-id', group.id);
+
+await client.teamBookingGroups.addMember('team-id', group.id, {
+  userId: 'user-id',
+  weight: 2, // Higher weight = more bookings
+});
+
+await client.teamBookingGroups.removeMember('team-id', group.id, 'user-id');
+
+// Delete a group
+await client.teamBookingGroups.deleteGroup('team-id', group.id);
+```
+
 ## ⚙️ Configuration
 
 ### ClientOptions
