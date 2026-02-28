@@ -8,7 +8,7 @@ export interface User {
   /** User email address. */
   email: string;
   /** Display name, if set. */
-  name: string | null;
+  displayName: string | null;
   /** User role (`user` or `admin`). */
   role: string;
   /** Current subscription tier (`free`, `pro`, or `business`). */
@@ -102,7 +102,7 @@ export interface TeamInvitationInboxItem {
   /** Display name of the team. */
   teamName: string;
   /** Role the user will receive upon accepting. */
-  role: 'admin' | 'member';
+  role: 'owner' | 'admin' | 'editor' | 'viewer';
   /** Email or name of the user who sent the invitation. */
   invitedBy: string;
   /** ISO 8601 timestamp when the invitation was created. */
@@ -218,14 +218,14 @@ export class UserResource {
   }
 
   /**
-   * Updates the authenticated user's display name or public profile slug.
+   * Updates the authenticated user's profile information.
    *
-   * @param params - Fields to update (name and/or slug)
+   * @param params - Fields to update (displayName, avatarUrl, profileSlug, profileBio, and/or profileIsPublic)
    * @returns Success message
-   * @throws {ConflictError} If the requested slug is already taken
-   * @throws {ValidationError} If the slug format is invalid
+   * @throws {ConflictError} If the requested profileSlug is already taken
+   * @throws {ValidationError} If the profileSlug format is invalid
    */
-  async updateProfile(params: { name?: string; slug?: string }): Promise<{ message: string }> {
+  async updateProfile(params: { displayName?: string; avatarUrl?: string | null; profileSlug?: string | null; profileBio?: string | null; profileIsPublic?: boolean }): Promise<{ message: string }> {
     try {
       return await this.http.put('account/profile', { json: params }).json<{ message: string }>();
     } catch (error) {

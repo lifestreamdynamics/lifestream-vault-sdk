@@ -131,6 +131,76 @@ export interface UpdateEventTemplateInput {
   metadata?: unknown;
 }
 
+/** Response returned when setting or clearing a document due date or completion state. */
+export interface DocumentDueResponse {
+  id: string;
+  path: string;
+  dueAt?: string | null;
+  completedAt?: string | null;
+  priority?: string | null;
+}
+
+export interface TimelineItem {
+  type: 'event' | 'due';
+  date: string;
+  event?: CalendarEvent;
+  document?: DueDocument;
+}
+
+export interface TimelineResponse {
+  items: TimelineItem[];
+  nextCursor?: string;
+  total: number;
+}
+
+export interface UpcomingResponse {
+  events: CalendarEvent[];
+  dueDocs: DueDocument[];
+}
+
+export interface ICalTokenResponse {
+  token: string;
+  feedUrl: string;
+  createdAt: string;
+}
+
+export interface ICalTokenStatus {
+  hasToken: boolean;
+  createdAt?: string;
+}
+
+export interface CalendarConnector {
+  id: string;
+  userId: string;
+  vaultId: string;
+  provider: 'google' | 'outlook';
+  expiresAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CalendarConnectorSyncResult {
+  synced: number;
+  errors: number;
+  syncedAt: string;
+}
+
+export interface CalendarConnectorOAuthResult {
+  authUrl: string;
+}
+
+export interface EventParticipant {
+  id: string;
+  calendarEventId: string;
+  userId?: string;
+  email: string;
+  name?: string;
+  status: 'invited' | 'accepted' | 'declined' | 'tentative';
+  role: 'organizer' | 'attendee' | 'optional';
+  respondedAt?: string;
+  createdAt: string;
+}
+
 /**
  * Resource for calendar, activity, and due date operations.
  *
@@ -338,9 +408,9 @@ export class CalendarResource {
    * @throws {NotFoundError} If the vault or document does not exist
    * @throws {NetworkError} If the request fails due to network issues
    */
-  async setDocumentDue(vaultId: string, path: string, data: { dueAt?: string | null; priority?: string | null; recurrence?: string | null }): Promise<unknown> {
+  async setDocumentDue(vaultId: string, path: string, data: { dueAt?: string | null; priority?: string | null; recurrence?: string | null }): Promise<DocumentDueResponse> {
     try {
-      return await this.http.patch(`vaults/${vaultId}/documents/${path}/due`, { json: data }).json();
+      return await this.http.patch(`vaults/${vaultId}/documents/${path}/due`, { json: data }).json<DocumentDueResponse>();
     } catch (error) {
       throw await handleError(error, 'Set Due Date', path);
     }
@@ -464,23 +534,24 @@ export class CalendarResource {
   }
 
   /**
-   * Toggle the completed state of a document.
-   * If the document is not yet completed, sets `completedAt` to now.
-   * If it is already completed, clears `completedAt`.
+   * Set the completed state of a document.
+   * When `completed` is true, sets `completedAt` to the current time.
+   * When `completed` is false, clears `completedAt`.
    *
    * @param vaultId - Vault ID
    * @param documentPath - Path of the document within the vault
+   * @param completed - Whether to mark the document as completed (`true`) or incomplete (`false`)
    * @returns The updated document metadata
    * @throws {AuthenticationError} If the request is not authenticated
    * @throws {AuthorizationError} If the user does not have access to the vault
    * @throws {NotFoundError} If the vault or document does not exist
    * @throws {NetworkError} If the request fails due to network issues
    */
-  async toggleComplete(vaultId: string, documentPath: string): Promise<unknown> {
+  async toggleComplete(vaultId: string, documentPath: string, completed: boolean): Promise<DocumentDueResponse> {
     try {
       return await this.http.patch(`vaults/${vaultId}/documents/${documentPath}`, {
-        json: { completedAt: new Date().toISOString() },
-      }).json();
+        json: { completedAt: completed ? new Date().toISOString() : null },
+      }).json<DocumentDueResponse>();
     } catch (error) {
       throw await handleError(error, 'Toggle Complete', documentPath);
     }
@@ -716,67 +787,3 @@ export class CalendarResource {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Additional interfaces for new methods
-// ---------------------------------------------------------------------------
-
-export interface TimelineItem {
-  type: 'event' | 'due';
-  date: string;
-  event?: CalendarEvent;
-  document?: DueDocument;
-}
-
-export interface TimelineResponse {
-  items: TimelineItem[];
-  nextCursor?: string;
-  total: number;
-}
-
-export interface UpcomingResponse {
-  events: CalendarEvent[];
-  dueDocs: DueDocument[];
-}
-
-export interface ICalTokenResponse {
-  token: string;
-  feedUrl: string;
-  createdAt: string;
-}
-
-export interface ICalTokenStatus {
-  hasToken: boolean;
-  createdAt?: string;
-}
-
-export interface CalendarConnector {
-  id: string;
-  userId: string;
-  vaultId: string;
-  provider: 'google' | 'outlook';
-  expiresAt?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CalendarConnectorSyncResult {
-  synced: number;
-  errors: number;
-  syncedAt: string;
-}
-
-export interface CalendarConnectorOAuthResult {
-  authUrl: string;
-}
-
-export interface EventParticipant {
-  id: string;
-  calendarEventId: string;
-  userId?: string;
-  email: string;
-  name?: string;
-  status: 'invited' | 'accepted' | 'declined' | 'tentative';
-  role: 'organizer' | 'attendee' | 'optional';
-  respondedAt?: string;
-  createdAt: string;
-}

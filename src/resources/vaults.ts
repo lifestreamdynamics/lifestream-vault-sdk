@@ -303,6 +303,15 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Returns the file tree for a vault as a nested structure.
+   *
+   * @param vaultId - The vault ID
+   * @returns Array of tree nodes (files and directories, nested)
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async getTree(vaultId: string): Promise<VaultTreeNode[]> {
     try {
       const data = await this.http.get(`vaults/${vaultId}/tree`).json<{ tree: VaultTreeNode[] }>();
@@ -312,6 +321,18 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Archives a vault, hiding it from the default vault list.
+   *
+   * Archived vaults are read-only and excluded from search results.
+   * Use `unarchive()` to restore access.
+   *
+   * @param vaultId - The vault ID to archive
+   * @returns The updated vault object with `isArchived: true`
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async archive(vaultId: string): Promise<Vault> {
     try {
       const data = await this.http.patch(`vaults/${vaultId}/archive`).json<{ vault: Vault }>();
@@ -321,6 +342,15 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Restores an archived vault to active status.
+   *
+   * @param vaultId - The vault ID to unarchive
+   * @returns The updated vault object with `isArchived: false`
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async unarchive(vaultId: string): Promise<Vault> {
     try {
       const data = await this.http.patch(`vaults/${vaultId}/unarchive`).json<{ vault: Vault }>();
@@ -330,6 +360,21 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Creates a zip export job for a vault.
+   *
+   * Export jobs are processed asynchronously. Poll `listExports()` until
+   * the job status is `complete`, then download with `downloadExport()`.
+   *
+   * @param vaultId - The vault ID to export
+   * @param params - Export options
+   * @param params.includeMetadata - Include document metadata in the archive. Default: false.
+   * @param params.format - Export format (currently only `'zip'`). Default: `'zip'`.
+   * @returns The created export job record
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async createExport(vaultId: string, params?: { includeMetadata?: boolean; format?: 'zip' }): Promise<VaultExportRecord> {
     try {
       return await this.http.post(`vaults/${vaultId}/export`, { json: params ?? {} }).json<VaultExportRecord>();
@@ -338,6 +383,15 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Lists all export jobs for a vault.
+   *
+   * @param vaultId - The vault ID
+   * @returns Array of export job records, newest first
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async listExports(vaultId: string): Promise<VaultExportRecord[]> {
     try {
       const data = await this.http.get(`vaults/${vaultId}/export`).json<{ exports: VaultExportRecord[] }>();
@@ -347,6 +401,16 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Downloads a completed vault export archive.
+   *
+   * @param vaultId - The vault ID
+   * @param exportId - The export job ID (must have `status: 'complete'`)
+   * @returns A `Blob` containing the zip archive
+   * @throws {NotFoundError} If the vault or export does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async downloadExport(vaultId: string, exportId: string): Promise<Blob> {
     try {
       return await this.http.get(`vaults/${vaultId}/export/${exportId}/download`).blob();
@@ -355,6 +419,19 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Transfers vault ownership to another user.
+   *
+   * After transfer, the current user loses access to the vault. The target
+   * user must have an active account.
+   *
+   * @param vaultId - The vault ID to transfer
+   * @param targetEmail - Email address of the user to transfer ownership to
+   * @returns The updated vault object with the new owner
+   * @throws {NotFoundError} If the vault or target user does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async transfer(vaultId: string, targetEmail: string): Promise<Vault> {
     try {
       const data = await this.http.post(`vaults/${vaultId}/transfer`, { json: { targetEmail } }).json<{ vault: Vault }>();
@@ -364,6 +441,15 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Retrieves the vault-level MFA configuration.
+   *
+   * @param vaultId - The vault ID
+   * @returns The vault MFA configuration and current session verification status
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async getMfaConfig(vaultId: string): Promise<VaultMfaConfig> {
     try {
       return await this.http.get(`vaults/${vaultId}/mfa`).json<VaultMfaConfig>();
@@ -372,6 +458,21 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Sets the vault-level MFA requirement configuration.
+   *
+   * When `mfaRequired` is `true`, users must re-verify with MFA before
+   * accessing the vault, within the configured session window.
+   *
+   * @param vaultId - The vault ID
+   * @param params - MFA configuration parameters
+   * @param params.mfaRequired - Whether MFA is required to access the vault
+   * @param params.sessionWindowMinutes - How long an MFA verification session lasts (minutes)
+   * @returns The updated vault MFA configuration
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async setMfaConfig(vaultId: string, params: { mfaRequired: boolean; sessionWindowMinutes?: number }): Promise<VaultMfaConfig> {
     try {
       return await this.http.put(`vaults/${vaultId}/mfa`, { json: params }).json<VaultMfaConfig>();
@@ -380,6 +481,22 @@ export class VaultsResource {
     }
   }
 
+  /**
+   * Verifies MFA for vault access, establishing a session window.
+   *
+   * Must be called before accessing a vault with `mfaRequired: true`. The
+   * verification is valid for the configured `sessionWindowMinutes`.
+   *
+   * @param vaultId - The vault ID
+   * @param params - Verification parameters
+   * @param params.method - MFA method to use (`'totp'` or `'backup_code'`)
+   * @param params.code - The TOTP code or backup code
+   * @returns Verification result with `verified` flag and session expiry
+   * @throws {NotFoundError} If the vault does not exist
+   * @throws {ValidationError} If the code is invalid or the method is unsupported
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {NetworkError} If the request fails due to network issues
+   */
   async verifyMfa(vaultId: string, params: { method: 'totp' | 'backup_code'; code: string }): Promise<{ verified: boolean; expiresAt: string }> {
     try {
       return await this.http.post(`vaults/${vaultId}/mfa/verify`, { json: params }).json<{ verified: boolean; expiresAt: string }>();

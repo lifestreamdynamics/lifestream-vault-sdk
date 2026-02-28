@@ -49,10 +49,11 @@ export class RateLimitError extends SDKError {
 }
 
 export class NetworkError extends SDKError {
-  override cause?: Error;
+  /** The original error that caused this network failure, if any. */
+  readonly originalError?: Error;
 
-  constructor(message: string, cause?: Error) {
+  constructor(message: string, originalError?: Error) {
     super(message);
-    this.cause = cause;
+    this.originalError = originalError;
   }
 }

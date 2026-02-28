@@ -165,19 +165,6 @@ export interface CreateTemplateInput {
   defaults: Record<string, unknown>;
 }
 
-// ---------------------------------------------------------------------------
-// Team Booking Groups — re-exported from team-booking-groups.ts for backward compat
-// ---------------------------------------------------------------------------
-
-export type {
-  AssignmentMode,
-  TeamBookingGroup,
-  TeamBookingGroupMember,
-  CreateBookingGroupInput,
-  UpdateBookingGroupInput,
-  AddGroupMemberInput,
-} from './team-booking-groups.js';
-
 /**
  * Resource for booking slots and guest booking management.
  *

@@ -89,9 +89,11 @@ export class AiResource {
     message: string;
     sessionId?: string;
     vaultId?: string;
+    signal?: AbortSignal;
   }): Promise<{ sessionId: string; message: { role: string; content: string; sources: string[] }; tokensUsed: number }> {
+    const { signal, ...body } = params;
     try {
-      return await this.http.post('ai/chat', { json: params }).json();
+      return await this.http.post('ai/chat', { json: body, signal }).json<{ sessionId: string; message: { role: string; content: string; sources: string[] }; tokensUsed: number }>();
     } catch (error) {
       throw await handleError(error, 'AI Chat', params.sessionId ?? '');
     }
@@ -143,7 +145,7 @@ export class AiResource {
    */
   async getSession(sessionId: string): Promise<{ session: AiChatSession; messages: AiChatMessage[] }> {
     try {
-      return await this.http.get(`ai/sessions/${sessionId}`).json();
+      return await this.http.get(`ai/sessions/${sessionId}`).json<{ session: AiChatSession; messages: AiChatMessage[] }>();
     } catch (error) {
       throw await handleError(error, 'AI Session', sessionId);
     }
@@ -201,9 +203,24 @@ export class AiResource {
     try {
       return await this.http.post('ai/summarize', {
         json: { vaultId, documentPath },
-      }).json();
+      }).json<{ summary: string; keyTopics: string[]; tokensUsed: number }>();
     } catch (error) {
       throw await handleError(error, 'AI Summarize', documentPath);
+    }
+  }
+
+  /**
+   * Async generator that yields all AI chat sessions.
+   *
+   * Note: The sessions list endpoint does not paginate today, so this yields all
+   * results in a single batch. It exists for API consistency with other listAll() methods.
+   *
+   * @yields AiChatSession objects, ordered by most recent first
+   */
+  async *listAllSessions(): AsyncGenerator<AiChatSession> {
+    const sessions = await this.listSessions();
+    for (const session of sessions) {
+      yield session;
     }
   }
 }

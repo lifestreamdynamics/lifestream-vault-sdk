@@ -15,7 +15,7 @@ export interface AuthTokens {
   user: {
     id: string;
     email: string;
-    name?: string;
+    displayName?: string;
     role: string;
     [key: string]: unknown;
   };
@@ -153,15 +153,38 @@ export class TokenManager {
   }
 
   private async performRefresh(http: KyInstance): Promise<string> {
-    const response = await http.post('auth/refresh', {
-      headers: {
-        'X-Requested-With': 'LifestreamVaultSDK',
-        'Cookie': `lsv_refresh=${this.refreshToken}`,
-      },
-    }).json<AuthTokens>();
+    // The Cookie header is a forbidden header in browsers and will be silently
+    // stripped. In browser environments we rely on the httpOnly cookie being
+    // sent automatically via credentials: 'include'. In Node.js / server
+    // environments we set it explicitly.
+    const isBrowser = typeof globalThis.document !== 'undefined';
+    const headers: Record<string, string> = {
+      'X-Requested-With': 'LifestreamVaultSDK',
+    };
+    if (!isBrowser && this.refreshToken) {
+      headers['Cookie'] = `lsv_refresh=${this.refreshToken}`;
+    }
 
-    this.accessToken = response.accessToken;
-    this.onTokenRefresh?.(response);
+    const response = await http.post('auth/refresh', {
+      headers,
+      ...(isBrowser ? { credentials: 'include' as RequestCredentials } : {}),
+    });
+
+    const data = await response.json<AuthTokens>();
+    this.accessToken = data.accessToken;
+
+    // Support refresh token rotation: if the server rotated the refresh token,
+    // capture the new value from the Set-Cookie header (Node.js) or store it
+    // from the response body if the API ever includes it there.
+    const setCookie = response.headers?.get?.('set-cookie');
+    if (setCookie) {
+      const match = setCookie.match(/lsv_refresh=([^;]+)/);
+      if (match) {
+        this.refreshToken = match[1];
+      }
+    }
+
+    this.onTokenRefresh?.(data);
 
     return this.accessToken;
   }

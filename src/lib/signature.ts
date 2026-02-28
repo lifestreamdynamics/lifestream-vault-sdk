@@ -1,5 +1,3 @@
-import crypto from 'node:crypto';
-
 /**
  * Headers used for HMAC request signing.
  */
@@ -14,6 +12,38 @@ export const SIGNATURE_NONCE_HEADER = 'x-signature-nonce';
 export const MAX_TIMESTAMP_AGE_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Compute a SHA-256 hash of a string and return it as a lowercase hex string.
+ * Uses the Web Crypto API (available in Node 18+, all modern browsers, Deno, Bun).
+ */
+async function sha256Hex(data: string): Promise<string> {
+  const encoded = new TextEncoder().encode(data);
+  const hash = await globalThis.crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(hash))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Compute an HMAC-SHA256 of a message using a secret key.
+ * Returns the result as a lowercase hex string.
+ * Uses the Web Crypto API (available in Node 18+, all modern browsers, Deno, Bun).
+ */
+async function hmacSha256Hex(key: string, data: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const cryptoKey = await globalThis.crypto.subtle.importKey(
+    'raw',
+    encoder.encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await globalThis.crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(data));
+  return Array.from(new Uint8Array(sig))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
  * Constructs the canonical payload string for HMAC signing.
  *
  * Format: METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_HASH
@@ -25,17 +55,14 @@ export const MAX_TIMESTAMP_AGE_MS = 5 * 60 * 1000; // 5 minutes
  * @param body - Request body string (empty string if no body)
  * @returns The canonical payload string
  */
-export function buildSignaturePayload(
+export async function buildSignaturePayload(
   method: string,
   path: string,
   timestamp: string,
   nonce: string,
   body: string,
-): string {
-  const bodyHash = crypto
-    .createHash('sha256')
-    .update(body)
-    .digest('hex');
+): Promise<string> {
+  const bodyHash = await sha256Hex(body);
   return `${method.toUpperCase()}\n${path}\n${timestamp}\n${nonce}\n${bodyHash}`;
 }
 
@@ -46,18 +73,20 @@ export function buildSignaturePayload(
  * @param payload - The canonical payload string
  * @returns Hex-encoded HMAC signature
  */
-export function signPayload(secret: string, payload: string): string {
-  return crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
+export async function signPayload(secret: string, payload: string): Promise<string> {
+  return hmacSha256Hex(secret, payload);
 }
 
 /**
  * Generates a cryptographically secure 16-byte hex nonce.
+ * Uses the Web Crypto API (available in Node 18+, all modern browsers, Deno, Bun).
  */
 export function generateNonce(): string {
-  return crypto.randomBytes(16).toString('hex');
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
@@ -69,16 +98,16 @@ export function generateNonce(): string {
  * @param body - Request body string (empty string for no body)
  * @returns Object containing the three signature headers
  */
-export function signRequest(
+export async function signRequest(
   apiKey: string,
   method: string,
   path: string,
   body: string = '',
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const timestamp = new Date().toISOString();
   const nonce = generateNonce();
-  const payload = buildSignaturePayload(method, path, timestamp, nonce, body);
-  const signature = signPayload(apiKey, payload);
+  const payload = await buildSignaturePayload(method, path, timestamp, nonce, body);
+  const signature = await signPayload(apiKey, payload);
 
   return {
     [SIGNATURE_HEADER]: signature,

@@ -44,12 +44,12 @@ describe('AuditLogger', () => {
   });
 
   describe('log', () => {
-    it('should create the log file and write a JSONL entry', () => {
+    it('should create the log file and write a JSONL entry', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
       const entry = sampleEntry();
-      logger.log(entry);
+      await logger.log(entry);
 
       const content = fs.readFileSync(logPath, 'utf-8');
       const lines = content.trim().split('\n');
@@ -57,13 +57,13 @@ describe('AuditLogger', () => {
       expect(JSON.parse(lines[0])).toEqual(entry);
     });
 
-    it('should append multiple entries', () => {
+    it('should append multiple entries', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ method: 'GET' }));
-      logger.log(sampleEntry({ method: 'POST' }));
-      logger.log(sampleEntry({ method: 'DELETE' }));
+      await logger.log(sampleEntry({ method: 'GET' }));
+      await logger.log(sampleEntry({ method: 'POST' }));
+      await logger.log(sampleEntry({ method: 'DELETE' }));
 
       const content = fs.readFileSync(logPath, 'utf-8');
       const lines = content.trim().split('\n');
@@ -73,21 +73,21 @@ describe('AuditLogger', () => {
       expect(JSON.parse(lines[2]).method).toBe('DELETE');
     });
 
-    it('should create parent directories if they do not exist', () => {
+    it('should create parent directories if they do not exist', async () => {
       const logPath = path.join(tmpDir, 'nested', 'deep', 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry());
+      await logger.log(sampleEntry());
 
       expect(fs.existsSync(logPath)).toBe(true);
     });
 
-    it('should not log Authorization headers, bodies, or query parameters', () => {
+    it('should not log Authorization headers, bodies, or query parameters', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
       const entry = sampleEntry({ path: '/api/v1/vaults' });
-      logger.log(entry);
+      await logger.log(entry);
 
       const content = fs.readFileSync(logPath, 'utf-8');
       const parsed = JSON.parse(content.trim());
@@ -99,14 +99,14 @@ describe('AuditLogger', () => {
   });
 
   describe('log rotation', () => {
-    it('should rotate when file exceeds max size', () => {
+    it('should rotate when file exceeds max size', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath, maxSize: 100, maxFiles: 3 });
 
       // Write enough data to exceed 100 bytes
       const entry = sampleEntry({ path: '/api/v1/vaults/some-long-path-to-exceed-size' });
-      logger.log(entry); // First entry fills the file
-      logger.log(entry); // Should trigger rotation
+      await logger.log(entry); // First entry fills the file
+      await logger.log(entry); // Should trigger rotation
 
       // Original file should exist (new data after rotation)
       expect(fs.existsSync(logPath)).toBe(true);
@@ -114,13 +114,13 @@ describe('AuditLogger', () => {
       expect(fs.existsSync(`${logPath}.1`)).toBe(true);
     });
 
-    it('should keep only maxFiles rotated files', () => {
+    it('should keep only maxFiles rotated files', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath, maxSize: 50, maxFiles: 2 });
 
       // Write enough entries to trigger multiple rotations
       for (let i = 0; i < 10; i++) {
-        logger.log(sampleEntry({ durationMs: i }));
+        await logger.log(sampleEntry({ durationMs: i }));
       }
 
       // Should not have more than maxFiles rotated files
@@ -138,12 +138,12 @@ describe('AuditLogger', () => {
       expect(logger.readEntries()).toEqual([]);
     });
 
-    it('should read all entries from log file', () => {
+    it('should read all entries from log file', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ method: 'GET' }));
-      logger.log(sampleEntry({ method: 'POST' }));
+      await logger.log(sampleEntry({ method: 'GET' }));
+      await logger.log(sampleEntry({ method: 'POST' }));
 
       const entries = logger.readEntries();
       expect(entries).toHaveLength(2);
@@ -151,12 +151,12 @@ describe('AuditLogger', () => {
       expect(entries[1].method).toBe('POST');
     });
 
-    it('should filter by tail count', () => {
+    it('should filter by tail count', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
       for (let i = 0; i < 10; i++) {
-        logger.log(sampleEntry({ durationMs: i }));
+        await logger.log(sampleEntry({ durationMs: i }));
       }
 
       const entries = logger.readEntries({ tail: 3 });
@@ -165,52 +165,52 @@ describe('AuditLogger', () => {
       expect(entries[2].durationMs).toBe(9);
     });
 
-    it('should filter by status code', () => {
+    it('should filter by status code', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ status: 200 }));
-      logger.log(sampleEntry({ status: 401 }));
-      logger.log(sampleEntry({ status: 200 }));
-      logger.log(sampleEntry({ status: 500 }));
+      await logger.log(sampleEntry({ status: 200 }));
+      await logger.log(sampleEntry({ status: 401 }));
+      await logger.log(sampleEntry({ status: 200 }));
+      await logger.log(sampleEntry({ status: 500 }));
 
       const entries = logger.readEntries({ status: 401 });
       expect(entries).toHaveLength(1);
       expect(entries[0].status).toBe(401);
     });
 
-    it('should filter by since date', () => {
+    it('should filter by since date', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z' }));
-      logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z' }));
-      logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z' }));
 
       const entries = logger.readEntries({ since: '2026-02-10' });
       expect(entries).toHaveLength(2);
     });
 
-    it('should filter by until date', () => {
+    it('should filter by until date', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z' }));
-      logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z' }));
-      logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z' }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z' }));
 
       const entries = logger.readEntries({ until: '2026-02-10T00:00:00.000Z' });
       expect(entries).toHaveLength(2);
     });
 
-    it('should combine multiple filters', () => {
+    it('should combine multiple filters', async () => {
       const logPath = path.join(tmpDir, 'audit.log');
       const logger = new AuditLogger({ logPath });
 
-      logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z', status: 200 }));
-      logger.log(sampleEntry({ timestamp: '2026-02-05T00:00:00.000Z', status: 401 }));
-      logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z', status: 401 }));
-      logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z', status: 200 }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-01T00:00:00.000Z', status: 200 }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-05T00:00:00.000Z', status: 401 }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-10T00:00:00.000Z', status: 401 }));
+      await logger.log(sampleEntry({ timestamp: '2026-02-13T00:00:00.000Z', status: 200 }));
 
       const entries = logger.readEntries({ since: '2026-02-03', status: 401 });
       expect(entries).toHaveLength(2);

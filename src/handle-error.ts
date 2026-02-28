@@ -36,7 +36,7 @@ export async function handleError(
     if (status === 400) throw new ValidationError(msg, body.details);
     if (status === 401) throw new AuthenticationError(msg);
     if (status === 403) throw new AuthorizationError(msg);
-    if (status === 404) throw new NotFoundError(resource, identifier);
+    if (status === 404) throw new NotFoundError(resource, identifier || msg);
     if (status === 409) throw new ConflictError(msg);
     if (status === 429) throw new RateLimitError(msg);
 

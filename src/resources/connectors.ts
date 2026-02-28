@@ -2,7 +2,7 @@ import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
 
 /** Supported connector providers. */
-export type ConnectorProvider = 'google_drive';
+export type ConnectorProvider = 'google_drive' | 'dropbox' | 'onedrive';
 
 /** Sync direction for a connector. */
 export type SyncDirection = 'pull' | 'push' | 'bidirectional';

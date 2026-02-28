@@ -9,6 +9,7 @@ function createKyMock() {
     get: vi.fn().mockReturnValue(responseMock),
     post: vi.fn().mockReturnValue(responseMock),
     put: vi.fn().mockReturnValue(responseMock),
+    patch: vi.fn().mockReturnValue(responseMock),
     delete: vi.fn().mockReturnValue({ json: vi.fn() }),
     _json: jsonFn,
   };
@@ -25,6 +26,15 @@ const mockPublishedVault = {
   isPublished: true,
   createdAt: '2024-01-01T00:00:00Z',
   updatedAt: '2024-01-01T00:00:00Z',
+  publishedBy: 'user1',
+  customDomainId: null,
+  showCalendar: false,
+  theme: 'default',
+  bookingLogoUrl: null,
+  bookingAccentColor: null,
+  bookingWelcomeMessage: null,
+  hidePoweredBy: false,
+  publishedAt: '2024-01-01T00:00:00Z',
 };
 
 describe('PublishVaultResource', () => {
@@ -51,10 +61,10 @@ describe('PublishVaultResource', () => {
     expect(result).toEqual(mockPublishedVault);
   });
 
-  it('update() puts and unwraps updated published vault', async () => {
+  it('update() patches and unwraps updated published vault', async () => {
     kyMock._json.mockResolvedValue({ publishedVault: { ...mockPublishedVault, title: 'Updated' } });
     const result = await resource.update('v1', { title: 'Updated' });
-    expect(kyMock.put).toHaveBeenCalledWith('vaults/v1/publish-vault', { json: { title: 'Updated' } });
+    expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1/publish-vault', { json: { title: 'Updated' } });
     expect(result.title).toBe('Updated');
   });
 

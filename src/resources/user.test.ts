@@ -17,7 +17,7 @@ describe('UserResource', () => {
       const mockUser = {
         id: 'u1',
         email: 'user@example.com',
-        name: 'Test User',
+        displayName: 'Test User',
         role: 'user',
         subscriptionTier: 'pro',
         subscriptionExpiresAt: '2025-12-31T00:00:00Z',
@@ -32,11 +32,11 @@ describe('UserResource', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should handle user with null name and free tier', async () => {
+    it('should handle user with null displayName and free tier', async () => {
       const mockUser = {
         id: 'u2',
         email: 'free@example.com',
-        name: null,
+        displayName: null,
         role: 'user',
         subscriptionTier: 'free',
         subscriptionExpiresAt: null,
@@ -47,7 +47,7 @@ describe('UserResource', () => {
 
       const result = await resource.me();
 
-      expect(result.name).toBeNull();
+      expect(result.displayName).toBeNull();
       expect(result.subscriptionTier).toBe('free');
       expect(result.subscriptionExpiresAt).toBeNull();
     });
@@ -228,7 +228,7 @@ describe('UserResource', () => {
   describe('listTeamInvitations', () => {
     it('should get pending invitations and unwrap invitations array', async () => {
       const invitations = [
-        { id: 'inv1', teamId: 't1', teamName: 'Engineering', role: 'member' as const, invitedBy: 'owner@test.com', createdAt: '2024-01-01', expiresAt: '2024-01-08' },
+        { id: 'inv1', teamId: 't1', teamName: 'Engineering', role: 'editor' as const, invitedBy: 'owner@test.com', createdAt: '2024-01-01', expiresAt: '2024-01-08' },
       ];
       mockJsonResponse(kyMock.get, { invitations });
 

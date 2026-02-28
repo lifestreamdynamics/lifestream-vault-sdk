@@ -38,6 +38,16 @@ const RETRY_HEADER = 'X-Retry-After-Refresh';
 export const DEFAULT_API_URL = 'https://vault.lifestreamdynamics.com';
 
 /**
+ * Extracts the `lsv_refresh` token value from a `Set-Cookie` header string.
+ * Returns null if the header is absent or the cookie is not present.
+ */
+function extractRefreshToken(setCookie: string | null): string | null {
+  if (!setCookie) return null;
+  const match = setCookie.match(/lsv_refresh=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+/**
  * Configuration options for creating a {@link LifestreamVaultClient}.
  */
 export interface ClientOptions {
@@ -218,7 +228,8 @@ export class LifestreamVaultClient {
           body = await cloned.text();
         }
 
-        const sigHeaders = signRequest(apiKeyForSigning, method, url.pathname, body);
+        // signRequest is now async (uses Web Crypto API for browser compatibility)
+        const sigHeaders = await signRequest(apiKeyForSigning, method, url.pathname, body);
         for (const [key, value] of Object.entries(sigHeaders)) {
           request.headers.set(key, value);
         }
@@ -235,12 +246,12 @@ export class LifestreamVaultClient {
       });
 
       afterResponseHooks.push(
-        (request: Request, _options: unknown, response: Response) => {
+        async (request: Request, _options: unknown, response: Response) => {
           const startTime = requestTimings.get(request);
           const durationMs = startTime ? Date.now() - startTime : 0;
           const url = new URL(request.url);
           try {
-            auditLogger.log({
+            await auditLogger.log({
               timestamp: new Date().toISOString(),
               method: request.method,
               path: url.pathname,
@@ -284,6 +295,13 @@ export class LifestreamVaultClient {
       // Base ky instance without auth hooks (used for refresh requests to avoid recursion)
       const baseHttp = ky.create({ prefixUrl, timeout });
 
+      // Late-binding reference: the 401-retry hook must call the fully-configured
+      // http instance (which carries signing, audit-logging, and timeout settings)
+      // rather than the raw global ky() function. It is assigned after ky.create()
+      // below. The hook closure captures this variable, so by the time any 401 is
+      // received the assignment will already have taken place.
+      let configuredHttp: KyInstance;
+
       // JWT beforeRequest: proactive refresh + set Authorization header
       beforeRequestHooks.push(async (request: Request) => {
         if (tokenManager.needsRefresh() && tokenManager.getRefreshToken()) {
@@ -310,7 +328,9 @@ export class LifestreamVaultClient {
             });
             retryRequest.headers.set('Authorization', `Bearer ${newToken}`);
             retryRequest.headers.set(RETRY_HEADER, '1');
-            return ky(retryRequest);
+            // Use the configured ky instance so signing, audit-logging, and
+            // timeout settings are all applied to the retry request.
+            return configuredHttp(retryRequest);
           } catch {
             // Refresh failed; return original 401
             return response;
@@ -327,6 +347,9 @@ export class LifestreamVaultClient {
           afterResponse: afterResponseHooks,
         },
       });
+
+      // Assign the late-binding reference now that this.http is fully constructed.
+      configuredHttp = this.http;
     }
 
     this.vaults = new VaultsResource(this.http);
@@ -478,20 +501,13 @@ export class LifestreamVaultClient {
         user: {
           id: mfaData.user.id,
           email: mfaData.user.email,
-          name: mfaData.user.displayName,
+          displayName: mfaData.user.displayName,
           role: mfaData.user.role,
         },
       };
 
       // Extract refresh token from Set-Cookie header if present
-      const setCookie = mfaResponse.headers.get('set-cookie');
-      let refreshToken: string | null = null;
-      if (setCookie) {
-        const match = setCookie.match(/lsv_refresh=([^;]+)/);
-        if (match) {
-          refreshToken = match[1];
-        }
-      }
+      const refreshToken = extractRefreshToken(mfaResponse.headers.get('set-cookie'));
 
       const client = new LifestreamVaultClient({
         ...options,
@@ -510,20 +526,13 @@ export class LifestreamVaultClient {
       user: {
         id: authData.user.id,
         email: authData.user.email,
-        name: authData.user.displayName,
+        displayName: authData.user.displayName,
         role: authData.user.role,
       },
     };
 
     // Extract refresh token from Set-Cookie header if present
-    const setCookie = loginResponse.headers.get('set-cookie');
-    let refreshToken: string | null = null;
-    if (setCookie) {
-      const match = setCookie.match(/lsv_refresh=([^;]+)/);
-      if (match) {
-        refreshToken = match[1];
-      }
-    }
+    const refreshToken = extractRefreshToken(loginResponse.headers.get('set-cookie'));
 
     const client = new LifestreamVaultClient({
       ...options,

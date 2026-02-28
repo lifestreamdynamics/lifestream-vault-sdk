@@ -40,7 +40,7 @@ export interface AdminUser {
   /** User email address. */
   email: string;
   /** Display name, or `null`. */
-  name: string | null;
+  displayName: string | null;
   /** User role (`user` or `admin`). */
   role: string;
   /** Whether the user account is active. */
@@ -179,7 +179,7 @@ export class AdminResource {
     try {
       return await this.http.get('admin/stats').json<SystemStats>();
     } catch (error) {
-      throw await handleError(error, 'Admin stats', '');
+      throw await handleError(error, 'AdminStats', '');
     }
   }
 
@@ -239,7 +239,7 @@ export class AdminResource {
         searchParams: Object.keys(searchParams).length > 0 ? searchParams : undefined,
       }).json<AdminUserListResponse>();
     } catch (error) {
-      throw await handleError(error, 'Users', '');
+      throw await handleError(error, 'AdminUsers', '');
     }
   }
 
@@ -322,7 +322,7 @@ export class AdminResource {
       }).json<ActivityEntry[]>();
       return data;
     } catch (error) {
-      throw await handleError(error, 'Activity', '');
+      throw await handleError(error, 'AdminActivity', '');
     }
   }
 
@@ -344,7 +344,7 @@ export class AdminResource {
     try {
       return await this.http.get('admin/subscriptions').json<SubscriptionSummary>();
     } catch (error) {
-      throw await handleError(error, 'Subscriptions', '');
+      throw await handleError(error, 'AdminSubscriptions', '');
     }
   }
 
@@ -366,7 +366,7 @@ export class AdminResource {
     try {
       return await this.http.get('admin/health').json<SystemHealth>();
     } catch (error) {
-      throw await handleError(error, 'Health', '');
+      throw await handleError(error, 'AdminHealth', '');
     }
   }
 
@@ -374,7 +374,7 @@ export class AdminResource {
     try {
       return await this.http.get('admin/backups/status').json<BackupStatus>();
     } catch (error) {
-      throw await handleError(error, 'Admin', '');
+      throw await handleError(error, 'AdminBackupStatus', '');
     }
   }
 }

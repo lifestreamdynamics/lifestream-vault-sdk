@@ -407,6 +407,25 @@ describe('DocumentsResource', () => {
       });
       expect(results).toHaveLength(0);
     });
+
+    it('should stop after maxPages pages to prevent infinite loops', async () => {
+      // Server always returns a full page (simulates server that ignores pagination)
+      const page = [
+        { path: 'a.md', title: 'A', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+        { path: 'b.md', title: 'B', tags: [], sizeBytes: 100, fileModifiedAt: '2024-01-01' },
+      ];
+      kyMock.get.mockReturnValue({ json: async () => ({ documents: page }) });
+
+      const results: unknown[] = [];
+      // maxPages=3 limits total fetched pages (loop runs while pageCount < 3)
+      for await (const doc of resource.listAll('v1', undefined, 2, 3)) {
+        results.push(doc);
+      }
+
+      // Pages fetched at pageCount=0, 1, 2 → 3 pages * 2 docs each = 6 results
+      expect(results).toHaveLength(6);
+      expect(kyMock.get).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('putMany', () => {

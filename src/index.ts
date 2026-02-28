@@ -49,6 +49,7 @@ export type {
   BackupStatus,
 } from './resources/admin.js';
 export { MfaResource } from './resources/mfa.js';
+export type { MfaStatus, TotpSetupResponse, PasskeyInfo } from './types/api.js';
 export { CalendarResource } from './resources/calendar.js';
 export type {
   CalendarEvent,

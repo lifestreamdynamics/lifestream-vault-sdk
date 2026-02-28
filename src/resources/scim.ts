@@ -57,8 +57,8 @@ export interface ScimListResponse {
 
 /** Input for provisioning a new SCIM user. */
 export interface ScimCreateUserInput {
-  /** Login name (email). */
-  userName?: string;
+  /** Login name (email). Required when creating a user. */
+  userName: string;
   /** Structured name. */
   name?: {
     /** Given/first name. */
@@ -155,7 +155,7 @@ export class ScimResource {
         searchParams: Object.keys(searchParams).length > 0 ? searchParams : undefined,
       }).json<ScimListResponse>();
     } catch (error) {
-      throw await handleError(error, 'SCIM Users', '');
+      throw await handleError(error, 'ScimUsers', '');
     }
   }
 
@@ -190,7 +190,7 @@ export class ScimResource {
     try {
       return await this.http.post('Users', { json: data }).json<ScimUser>();
     } catch (error) {
-      throw await handleError(error, 'SCIM Create User', '');
+      throw await handleError(error, 'ScimUser', data.userName);
     }
   }
 
@@ -239,7 +239,7 @@ export class ScimResource {
     try {
       return await this.http.get('ServiceProviderConfig').json<ScimServiceProviderConfig>();
     } catch (error) {
-      throw await handleError(error, 'SCIM ServiceProviderConfig', '');
+      throw await handleError(error, 'ScimServiceProviderConfig', '');
     }
   }
 }

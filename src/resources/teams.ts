@@ -1,6 +1,6 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
-import type { Vault } from '../types/index.js';
+import type { Vault } from './vaults.js';
 import type { CalendarResponse, CalendarActivityResponse, CalendarEvent, UpcomingResponse, AgendaResponse, DueDocument } from './calendar.js';
 
 /** A team object returned by the API. */
@@ -35,7 +35,7 @@ export interface TeamMember {
   user: {
     id: string;
     email: string;
-    name: string | null;
+    displayName: string | null;
   };
 }
 

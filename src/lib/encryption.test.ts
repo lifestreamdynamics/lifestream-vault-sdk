@@ -23,17 +23,17 @@ describe('encryption', () => {
   });
 
   describe('encrypt/decrypt roundtrip', () => {
-    it('should encrypt and decrypt a simple string', () => {
+    it('should encrypt and decrypt a simple string', async () => {
       const key = generateVaultKey();
       const plaintext = 'Hello, World!';
 
-      const encrypted = encrypt(plaintext, key);
-      const decrypted = decrypt(encrypted, key);
+      const encrypted = await encrypt(plaintext, key);
+      const decrypted = await decrypt(encrypted, key);
 
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should encrypt and decrypt markdown content', () => {
+    it('should encrypt and decrypt markdown content', async () => {
       const key = generateVaultKey();
       const plaintext = `---
 title: Secret Notes
@@ -48,51 +48,51 @@ This is a **confidential** document with:
 - Unicode: \u00e9\u00e8\u00ea \u00fc\u00f6\u00e4 \u2603\ufe0f\ud83d\ude80
 `;
 
-      const encrypted = encrypt(plaintext, key);
-      const decrypted = decrypt(encrypted, key);
+      const encrypted = await encrypt(plaintext, key);
+      const decrypted = await decrypt(encrypted, key);
 
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should encrypt and decrypt empty string', () => {
+    it('should encrypt and decrypt empty string', async () => {
       const key = generateVaultKey();
       const plaintext = '';
 
-      const encrypted = encrypt(plaintext, key);
-      const decrypted = decrypt(encrypted, key);
+      const encrypted = await encrypt(plaintext, key);
+      const decrypted = await decrypt(encrypted, key);
 
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should encrypt and decrypt large content', () => {
+    it('should encrypt and decrypt large content', async () => {
       const key = generateVaultKey();
       const plaintext = 'x'.repeat(1_000_000); // 1MB
 
-      const encrypted = encrypt(plaintext, key);
-      const decrypted = decrypt(encrypted, key);
+      const encrypted = await encrypt(plaintext, key);
+      const decrypted = await decrypt(encrypted, key);
 
       expect(decrypted).toBe(plaintext);
     });
 
-    it('should produce different ciphertext for the same plaintext (random IV)', () => {
+    it('should produce different ciphertext for the same plaintext (random IV)', async () => {
       const key = generateVaultKey();
       const plaintext = 'Same content';
 
-      const encrypted1 = encrypt(plaintext, key);
-      const encrypted2 = encrypt(plaintext, key);
+      const encrypted1 = await encrypt(plaintext, key);
+      const encrypted2 = await encrypt(plaintext, key);
 
       expect(encrypted1).not.toBe(encrypted2);
 
       // Both should decrypt to the same plaintext
-      expect(decrypt(encrypted1, key)).toBe(plaintext);
-      expect(decrypt(encrypted2, key)).toBe(plaintext);
+      expect(await decrypt(encrypted1, key)).toBe(plaintext);
+      expect(await decrypt(encrypted2, key)).toBe(plaintext);
     });
   });
 
   describe('envelope format', () => {
-    it('should produce a valid JSON envelope', () => {
+    it('should produce a valid JSON envelope', async () => {
       const key = generateVaultKey();
-      const encrypted = encrypt('test', key);
+      const encrypted = await encrypt('test', key);
       const envelope: EncryptedEnvelope = JSON.parse(encrypted);
 
       expect(envelope.version).toBe(1);
@@ -105,45 +105,45 @@ This is a **confidential** document with:
   });
 
   describe('error handling', () => {
-    it('should reject wrong key length', () => {
-      expect(() => encrypt('test', 'tooshort')).toThrow('Invalid key length');
-      expect(() => decrypt('{}', 'tooshort')).toThrow('Invalid key length');
+    it('should reject wrong key length', async () => {
+      await expect(encrypt('test', 'tooshort')).rejects.toThrow('Invalid key length');
+      await expect(decrypt('{}', 'tooshort')).rejects.toThrow('Invalid key length');
     });
 
-    it('should fail to decrypt with wrong key', () => {
+    it('should fail to decrypt with wrong key', async () => {
       const key1 = generateVaultKey();
       const key2 = generateVaultKey();
 
-      const encrypted = encrypt('secret', key1);
+      const encrypted = await encrypt('secret', key1);
 
-      expect(() => decrypt(encrypted, key2)).toThrow();
+      await expect(decrypt(encrypted, key2)).rejects.toThrow();
     });
 
-    it('should fail to decrypt tampered ciphertext', () => {
+    it('should fail to decrypt tampered ciphertext', async () => {
       const key = generateVaultKey();
-      const encrypted = encrypt('secret', key);
+      const encrypted = await encrypt('secret', key);
       const envelope: EncryptedEnvelope = JSON.parse(encrypted);
 
       // Tamper with ciphertext
       envelope.ciphertext = 'ff' + envelope.ciphertext.slice(2);
       const tampered = JSON.stringify(envelope);
 
-      expect(() => decrypt(tampered, key)).toThrow();
+      await expect(decrypt(tampered, key)).rejects.toThrow();
     });
 
-    it('should fail to decrypt tampered auth tag', () => {
+    it('should fail to decrypt tampered auth tag', async () => {
       const key = generateVaultKey();
-      const encrypted = encrypt('secret', key);
+      const encrypted = await encrypt('secret', key);
       const envelope: EncryptedEnvelope = JSON.parse(encrypted);
 
       // Tamper with auth tag
       envelope.authTag = '00'.repeat(16);
       const tampered = JSON.stringify(envelope);
 
-      expect(() => decrypt(tampered, key)).toThrow();
+      await expect(decrypt(tampered, key)).rejects.toThrow();
     });
 
-    it('should reject unsupported envelope version', () => {
+    it('should reject unsupported envelope version', async () => {
       const key = generateVaultKey();
       const envelope = JSON.stringify({
         version: 2,
@@ -153,10 +153,10 @@ This is a **confidential** document with:
         ciphertext: '00',
       });
 
-      expect(() => decrypt(envelope, key)).toThrow('Unsupported encryption envelope version');
+      await expect(decrypt(envelope, key)).rejects.toThrow('Unsupported encryption envelope version');
     });
 
-    it('should reject unsupported algorithm', () => {
+    it('should reject unsupported algorithm', async () => {
       const key = generateVaultKey();
       const envelope = JSON.stringify({
         version: 1,
@@ -166,19 +166,21 @@ This is a **confidential** document with:
         ciphertext: '00',
       });
 
-      expect(() => decrypt(envelope, key)).toThrow('Unsupported encryption algorithm');
+      await expect(decrypt(envelope, key)).rejects.toThrow('Unsupported encryption algorithm');
     });
 
-    it('should reject invalid JSON', () => {
+    it('should reject invalid JSON with a typed error message', async () => {
       const key = generateVaultKey();
-      expect(() => decrypt('not json', key)).toThrow();
+      await expect(decrypt('not json', key)).rejects.toThrow(
+        'Invalid encrypted envelope: not valid JSON',
+      );
     });
   });
 
   describe('isEncryptedEnvelope', () => {
-    it('should return true for valid envelopes', () => {
+    it('should return true for valid envelopes', async () => {
       const key = generateVaultKey();
-      const encrypted = encrypt('test', key);
+      const encrypted = await encrypt('test', key);
       expect(isEncryptedEnvelope(encrypted)).toBe(true);
     });
 

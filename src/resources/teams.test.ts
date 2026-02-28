@@ -146,8 +146,8 @@ describe('TeamsResource', () => {
   describe('listMembers', () => {
     it('should list team members', async () => {
       const mockMembers = [
-        { id: 'm1', teamId: 't1', userId: 'u1', role: 'owner', joinedAt: '2024-01-01', user: { id: 'u1', email: 'owner@test.com', name: 'Owner' } },
-        { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'member@test.com', name: null } },
+        { id: 'm1', teamId: 't1', userId: 'u1', role: 'owner', joinedAt: '2024-01-01', user: { id: 'u1', email: 'owner@test.com', displayName: 'Owner' } },
+        { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'member@test.com', displayName: null } },
       ];
       mockJsonResponse(kyMock.get, { members: mockMembers });
 
@@ -167,7 +167,7 @@ describe('TeamsResource', () => {
 
   describe('updateMemberRole', () => {
     it('should update a member role to admin', async () => {
-      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'admin', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', name: 'User' } };
+      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'admin', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', displayName: 'User' } };
       mockJsonResponse(kyMock.patch, mockMember);
 
       const result = await resource.updateMemberRole('t1', 'u2', 'admin');
@@ -177,7 +177,7 @@ describe('TeamsResource', () => {
     });
 
     it('should update a member role to member', async () => {
-      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', name: 'User' } };
+      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', displayName: 'User' } };
       mockJsonResponse(kyMock.patch, mockMember);
 
       const result = await resource.updateMemberRole('t1', 'u2', 'member');

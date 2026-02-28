@@ -36,25 +36,23 @@ export class AuditLogger {
     return this.logPath;
   }
 
-  log(entry: AuditEntry): void {
+  async log(entry: AuditEntry): Promise<void> {
     const dir = path.dirname(this.logPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    // mkdir with recursive:true is a no-op if the dir already exists
+    await fs.promises.mkdir(dir, { recursive: true });
 
-    this.rotateIfNeeded();
+    await this.rotateIfNeeded();
 
     const line = JSON.stringify(entry) + '\n';
-    fs.appendFileSync(this.logPath, line, 'utf-8');
+    await fs.promises.appendFile(this.logPath, line, 'utf-8');
   }
 
-  private rotateIfNeeded(): void {
-    if (!fs.existsSync(this.logPath)) return;
-
+  private async rotateIfNeeded(): Promise<void> {
     let stat: fs.Stats;
     try {
-      stat = fs.statSync(this.logPath);
+      stat = await fs.promises.stat(this.logPath);
     } catch {
+      // File does not exist yet — nothing to rotate
       return;
     }
 
@@ -62,21 +60,25 @@ export class AuditLogger {
 
     // Delete oldest rotated file if it exists
     const oldest = `${this.logPath}.${this.maxFiles}`;
-    if (fs.existsSync(oldest)) {
-      fs.unlinkSync(oldest);
+    try {
+      await fs.promises.unlink(oldest);
+    } catch {
+      // Ignore — file may not exist
     }
 
     // Shift existing rotated files: .4 -> .5, .3 -> .4, etc.
     for (let i = this.maxFiles - 1; i >= 1; i--) {
       const src = `${this.logPath}.${i}`;
       const dest = `${this.logPath}.${i + 1}`;
-      if (fs.existsSync(src)) {
-        fs.renameSync(src, dest);
+      try {
+        await fs.promises.rename(src, dest);
+      } catch {
+        // Ignore — file may not exist
       }
     }
 
     // Rotate current log to .1
-    fs.renameSync(this.logPath, `${this.logPath}.1`);
+    await fs.promises.rename(this.logPath, `${this.logPath}.1`);
   }
 
   readEntries(options: {
@@ -85,9 +87,12 @@ export class AuditLogger {
     since?: string;
     until?: string;
   } = {}): AuditEntry[] {
-    if (!fs.existsSync(this.logPath)) return [];
-
-    const content = fs.readFileSync(this.logPath, 'utf-8');
+    let content: string;
+    try {
+      content = fs.readFileSync(this.logPath, 'utf-8');
+    } catch {
+      return [];
+    }
     const lines = content.split('\n').filter(Boolean);
 
     let entries: AuditEntry[] = [];
@@ -120,7 +125,7 @@ export class AuditLogger {
   exportCsv(entries: AuditEntry[]): string {
     const header = 'timestamp,method,path,status,durationMs';
     const rows = entries.map(e =>
-      `${e.timestamp},${e.method},${csvEscape(e.path)},${e.status},${e.durationMs}`
+      `${csvEscape(e.timestamp)},${csvEscape(e.method)},${csvEscape(e.path)},${e.status},${e.durationMs}`
     );
     return [header, ...rows].join('\n') + '\n';
   }

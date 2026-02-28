@@ -29,9 +29,13 @@ export class CollaborationResource {
    * ```
    */
   getWebSocketUrl(vaultId: string, docPath: string): string {
-    const wsUrl = this.baseUrl
-      .replace(/^https:\/\//, 'wss://')
-      .replace(/^http:\/\//, 'ws://');
-    return `${wsUrl}/collab/${vaultId}/${docPath}`;
+    const url = new URL(this.baseUrl);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    // Encode the vaultId as a single path segment; encode each doc path segment
+    // individually so that directory separators (/) are preserved in the URL.
+    const encodedVaultId = encodeURIComponent(vaultId);
+    const encodedDocPath = docPath.split('/').map(encodeURIComponent).join('/');
+    url.pathname = `/collab/${encodedVaultId}/${encodedDocPath}`;
+    return url.toString();
   }
 }

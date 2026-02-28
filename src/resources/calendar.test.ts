@@ -480,6 +480,51 @@ describe('CalendarResource', () => {
     });
   });
 
+  describe('toggleComplete', () => {
+    it('should set completedAt to now when completed is true', async () => {
+      const mockResponse = { id: 'd1', completedAt: '2024-01-15T10:00:00Z' };
+      mockJsonResponse(kyMock.patch, mockResponse);
+
+      const before = Date.now();
+      const result = await resource.toggleComplete('vault-1', 'tasks/todo.md', true);
+      const after = Date.now();
+
+      expect(kyMock.patch).toHaveBeenCalledWith(
+        'vaults/vault-1/documents/tasks/todo.md',
+        expect.objectContaining({
+          json: expect.objectContaining({ completedAt: expect.any(String) }),
+        }),
+      );
+
+      // Verify completedAt is a valid ISO string (not null)
+      const call = vi.mocked(kyMock.patch).mock.calls[0];
+      const json = (call[1] as { json: { completedAt: string | null } }).json;
+      expect(json.completedAt).not.toBeNull();
+      const ts = new Date(json.completedAt!).getTime();
+      expect(ts).toBeGreaterThanOrEqual(before);
+      expect(ts).toBeLessThanOrEqual(after);
+      expect(result).toEqual(mockResponse);
+    });
+
+    it('should set completedAt to null when completed is false', async () => {
+      const mockResponse = { id: 'd1', completedAt: null };
+      mockJsonResponse(kyMock.patch, mockResponse);
+
+      await resource.toggleComplete('vault-1', 'tasks/todo.md', false);
+
+      expect(kyMock.patch).toHaveBeenCalledWith(
+        'vaults/vault-1/documents/tasks/todo.md',
+        { json: { completedAt: null } },
+      );
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.patch);
+
+      await expect(resource.toggleComplete('vault-1', 'tasks/todo.md', true)).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
   describe('error handling', () => {
     it('should throw NetworkError on network failure', async () => {
       mockNetworkError(kyMock.get);

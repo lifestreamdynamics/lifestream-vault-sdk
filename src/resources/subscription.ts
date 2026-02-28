@@ -169,7 +169,7 @@ export class SubscriptionResource {
     try {
       await this.http.post('subscription/cancel', {
         json: { reason },
-      }).json();
+      });
     } catch (error) {
       throw await handleError(error, 'Subscription', '');
     }

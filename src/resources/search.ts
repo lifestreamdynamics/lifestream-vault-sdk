@@ -125,20 +125,31 @@ export class SearchResource {
    *
    * @param params - Search parameters (same as search(), excluding offset)
    * @param pageSize - Number of results per page (default: 50)
+   * @param signal - Optional AbortSignal to cancel the iteration mid-stream
    * @yields SearchResult objects
    */
   async *searchAll(
     params: { q: string; vault?: string; tags?: string; mode?: 'text' | 'semantic' | 'hybrid' },
     pageSize = 50,
+    signal?: AbortSignal,
   ): AsyncGenerator<SearchResult> {
     let offset = 0;
     while (true) {
-      const results = await this.search({ ...params, limit: pageSize, offset });
-      for (const result of results.results) {
-        yield result;
+      if (signal?.aborted) break;
+      const searchParams: Record<string, string | number> = { q: params.q, limit: pageSize, offset };
+      if (params.vault) searchParams.vault = params.vault;
+      if (params.tags) searchParams.tags = params.tags;
+      if (params.mode) searchParams.mode = params.mode;
+      try {
+        const data = await this.http.get('search', { searchParams, signal }).json<SearchResponse>();
+        for (const result of data.results) {
+          yield result;
+        }
+        if (data.results.length < pageSize) break;
+        offset += pageSize;
+      } catch (error) {
+        throw await handleError(error, 'Search', params.q);
       }
-      if (results.results.length < pageSize) break;
-      offset += pageSize;
     }
   }
 }

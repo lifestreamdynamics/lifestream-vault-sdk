@@ -282,7 +282,7 @@ export class DocumentsResource {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/${sourcePath}/move`, {
         json: { destination, overwrite },
-      }).json();
+      }).json<{ message: string; source: string; destination: string }>();
     } catch (error) {
       throw await handleError(error, 'Document', sourcePath);
     }
@@ -320,7 +320,7 @@ export class DocumentsResource {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/${sourcePath}/copy`, {
         json: { destination, overwrite },
-      }).json();
+      }).json<{ message: string; source: string; destination: string }>();
     } catch (error) {
       throw await handleError(error, 'Document', sourcePath);
     }
@@ -365,7 +365,7 @@ export class DocumentsResource {
     try {
       const result = await this.http.get(`vaults/${vaultId}/documents/${docPath}`).json<DocumentWithContent>();
       if (result.document.encrypted) {
-        result.content = decrypt(result.content, keyHex);
+        result.content = await decrypt(result.content, keyHex);
       }
       return result;
     } catch (error) {
@@ -577,20 +577,31 @@ export class DocumentsResource {
    * @param vaultId - The vault ID to list documents from
    * @param dirPath - Optional directory path filter
    * @param pageSize - Number of documents per page (default: 100)
+   * @param maxPages - Safety limit on the number of pages fetched (default: 1000)
+   * @param signal - Optional AbortSignal to cancel the iteration mid-stream
    * @yields DocumentListItem objects
    */
-  async *listAll(vaultId: string, dirPath?: string, pageSize = 100): AsyncGenerator<DocumentListItem> {
+  async *listAll(vaultId: string, dirPath?: string, pageSize = 100, maxPages = 1000, signal?: AbortSignal): AsyncGenerator<DocumentListItem> {
     let offset = 0;
-    while (true) {
+    let pageCount = 0;
+
+    while (pageCount < maxPages) {
+      if (signal?.aborted) break;
       const searchParams: Record<string, string | number> = { limit: pageSize, offset };
       if (dirPath) searchParams.dir = dirPath;
       try {
-        const data = await this.http.get(`vaults/${vaultId}/documents`, { searchParams }).json<{ documents: DocumentListItem[] }>();
-        for (const doc of data.documents) {
+        const data = await this.http.get(`vaults/${vaultId}/documents`, { searchParams, signal }).json<{ documents: DocumentListItem[] }>();
+        const results = data.documents;
+
+        if (!Array.isArray(results) || results.length === 0) break;
+
+        for (const doc of results) {
           yield doc;
         }
-        if (data.documents.length < pageSize) break;
-        offset += pageSize;
+
+        if (results.length < pageSize) break;
+        offset += results.length;
+        pageCount++;
       } catch (error) {
         throw await handleError(error, 'Documents', vaultId);
       }

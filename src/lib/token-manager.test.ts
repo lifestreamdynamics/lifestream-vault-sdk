@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   decodeJwtPayload,
   isTokenExpired,
@@ -15,6 +15,20 @@ function createFakeJwt(payload: Record<string, unknown>): string {
   const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
   const signature = Buffer.from('fake-signature').toString('base64url');
   return `${header}.${body}.${signature}`;
+}
+
+/** Build a mock ky response object with optional Set-Cookie header. */
+function mockResponse(data: AuthTokens, setCookieValue?: string) {
+  const headers = new Map<string, string>();
+  if (setCookieValue !== undefined) {
+    headers.set('set-cookie', setCookieValue);
+  }
+  return {
+    json: vi.fn().mockResolvedValue(data),
+    headers: {
+      get: vi.fn((name: string) => headers.get(name.toLowerCase()) ?? null),
+    },
+  };
 }
 
 describe('decodeJwtPayload', () => {
@@ -150,27 +164,113 @@ describe('TokenManager', () => {
       await expect(mgr.refresh(mockHttp)).rejects.toThrow('No refresh token available');
     });
 
-    it('should call the refresh endpoint and update tokens', async () => {
+    it('should call the refresh endpoint and update tokens (Node env)', async () => {
       const newAccessToken = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
       const responseTokens: AuthTokens = {
         accessToken: newAccessToken,
         user: { id: 'u1', email: 'test@example.com', role: 'user' },
       };
 
-      const mockJsonFn = vi.fn().mockResolvedValue(responseTokens);
-      const mockPost = vi.fn().mockReturnValue({ json: mockJsonFn });
+      const mockRes = mockResponse(responseTokens);
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
       const mockHttp = { post: mockPost } as any;
 
       const result = await manager.refresh(mockHttp);
 
       expect(result).toBe(newAccessToken);
       expect(manager.getAccessToken()).toBe(newAccessToken);
-      expect(mockPost).toHaveBeenCalledWith('auth/refresh', {
-        headers: {
+
+      // In Node (no globalThis.document), Cookie header should be set
+      expect(mockPost).toHaveBeenCalledWith('auth/refresh', expect.objectContaining({
+        headers: expect.objectContaining({
           'X-Requested-With': 'LifestreamVaultSDK',
           'Cookie': `lsv_refresh=${refreshToken}`,
-        },
-      });
+        }),
+      }));
+    });
+
+    it('should not set Cookie header in browser env', async () => {
+      // Simulate browser environment by temporarily attaching document
+      const originalDocument = (globalThis as any).document;
+      (globalThis as any).document = {};
+
+      try {
+        const newAccessToken = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
+        const responseTokens: AuthTokens = {
+          accessToken: newAccessToken,
+          user: { id: 'u1', email: 'test@example.com', role: 'user' },
+        };
+
+        const mockRes = mockResponse(responseTokens);
+        const mockPost = vi.fn().mockResolvedValue(mockRes);
+        const mockHttp = { post: mockPost } as any;
+
+        await manager.refresh(mockHttp);
+
+        const callArgs = mockPost.mock.calls[0][1] as any;
+        expect(callArgs.headers['Cookie']).toBeUndefined();
+        expect(callArgs.credentials).toBe('include');
+      } finally {
+        if (originalDocument === undefined) {
+          delete (globalThis as any).document;
+        } else {
+          (globalThis as any).document = originalDocument;
+        }
+      }
+    });
+
+    it('should update refresh token when Set-Cookie contains a rotated token', async () => {
+      const newAccessToken = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
+      const responseTokens: AuthTokens = {
+        accessToken: newAccessToken,
+        user: { id: 'u1', email: 'test@example.com', role: 'user' },
+      };
+
+      const rotatedRefreshToken = 'rotated-refresh-token-xyz';
+      const mockRes = mockResponse(responseTokens, `lsv_refresh=${rotatedRefreshToken}; HttpOnly; Path=/`);
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
+      const mockHttp = { post: mockPost } as any;
+
+      expect(manager.getRefreshToken()).toBe(refreshToken);
+
+      await manager.refresh(mockHttp);
+
+      // Refresh token should be updated to the rotated value
+      expect(manager.getRefreshToken()).toBe(rotatedRefreshToken);
+      expect(manager.getAccessToken()).toBe(newAccessToken);
+    });
+
+    it('should keep existing refresh token when no Set-Cookie header is present', async () => {
+      const newAccessToken = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
+      const responseTokens: AuthTokens = {
+        accessToken: newAccessToken,
+        user: { id: 'u1', email: 'test@example.com', role: 'user' },
+      };
+
+      const mockRes = mockResponse(responseTokens); // no Set-Cookie
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
+      const mockHttp = { post: mockPost } as any;
+
+      await manager.refresh(mockHttp);
+
+      // Refresh token should remain unchanged
+      expect(manager.getRefreshToken()).toBe(refreshToken);
+    });
+
+    it('should keep existing refresh token when Set-Cookie does not contain lsv_refresh', async () => {
+      const newAccessToken = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
+      const responseTokens: AuthTokens = {
+        accessToken: newAccessToken,
+        user: { id: 'u1', email: 'test@example.com', role: 'user' },
+      };
+
+      const mockRes = mockResponse(responseTokens, 'some_other_cookie=value; HttpOnly');
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
+      const mockHttp = { post: mockPost } as any;
+
+      await manager.refresh(mockHttp);
+
+      expect(manager.getRefreshToken()).toBe(refreshToken);
     });
 
     it('should invoke onTokenRefresh callback', async () => {
@@ -183,9 +283,9 @@ describe('TokenManager', () => {
         user: { id: 'u1', email: 'test@example.com', role: 'user' },
       };
 
-      const mockHttp = {
-        post: vi.fn().mockReturnValue({ json: vi.fn().mockResolvedValue(responseTokens) }),
-      } as any;
+      const mockRes = mockResponse(responseTokens);
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
+      const mockHttp = { post: mockPost } as any;
 
       await mgr.refresh(mockHttp);
 
@@ -200,12 +300,16 @@ describe('TokenManager', () => {
       };
 
       let resolveRefresh: (value: AuthTokens) => void;
-      const refreshPromise = new Promise<AuthTokens>((resolve) => {
+      const refreshDataPromise = new Promise<AuthTokens>((resolve) => {
         resolveRefresh = resolve;
       });
 
-      const mockJsonFn = vi.fn().mockReturnValue(refreshPromise);
-      const mockPost = vi.fn().mockReturnValue({ json: mockJsonFn });
+      const mockJsonFn = vi.fn().mockReturnValue(refreshDataPromise);
+      const mockRes = {
+        json: mockJsonFn,
+        headers: { get: vi.fn().mockReturnValue(null) },
+      };
+      const mockPost = vi.fn().mockResolvedValue(mockRes);
       const mockHttp = { post: mockPost } as any;
 
       // Start two concurrent refresh calls
@@ -227,20 +331,13 @@ describe('TokenManager', () => {
       const token1 = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 });
       const token2 = createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 1800 });
 
+      const mockRes1 = mockResponse({ accessToken: token1, user: { id: 'u1', email: 'test@example.com', role: 'user' } });
+      const mockRes2 = mockResponse({ accessToken: token2, user: { id: 'u1', email: 'test@example.com', role: 'user' } });
+
       const mockHttp = {
         post: vi.fn()
-          .mockReturnValueOnce({
-            json: vi.fn().mockResolvedValue({
-              accessToken: token1,
-              user: { id: 'u1', email: 'test@example.com', role: 'user' },
-            }),
-          })
-          .mockReturnValueOnce({
-            json: vi.fn().mockResolvedValue({
-              accessToken: token2,
-              user: { id: 'u1', email: 'test@example.com', role: 'user' },
-            }),
-          }),
+          .mockResolvedValueOnce(mockRes1)
+          .mockResolvedValueOnce(mockRes2),
       } as any;
 
       await manager.refresh(mockHttp);
@@ -252,17 +349,19 @@ describe('TokenManager', () => {
     });
 
     it('should clear refresh promise on error so retry is possible', async () => {
+      const mockResError = {
+        json: vi.fn().mockRejectedValue(new Error('Network error')),
+        headers: { get: vi.fn().mockReturnValue(null) },
+      };
+      const mockResSuccess = mockResponse({
+        accessToken: createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 }),
+        user: { id: 'u1', email: 'test@example.com', role: 'user' },
+      });
+
       const mockHttp = {
         post: vi.fn()
-          .mockReturnValueOnce({
-            json: vi.fn().mockRejectedValue(new Error('Network error')),
-          })
-          .mockReturnValueOnce({
-            json: vi.fn().mockResolvedValue({
-              accessToken: createFakeJwt({ exp: Math.floor(Date.now() / 1000) + 900 }),
-              user: { id: 'u1', email: 'test@example.com', role: 'user' },
-            }),
-          }),
+          .mockResolvedValueOnce(mockResError)
+          .mockResolvedValueOnce(mockResSuccess),
       } as any;
 
       // First attempt fails
