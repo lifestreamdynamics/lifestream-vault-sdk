@@ -29,6 +29,18 @@ export interface AiChatMessage {
   createdAt: string;
 }
 
+/** A document similar to a reference document, found via vector similarity. */
+export interface SimilarDocument {
+  /** Document unique identifier. */
+  id: string;
+  /** Document file path within the vault. */
+  path: string;
+  /** Document title (from frontmatter or H1), or null. */
+  title: string | null;
+  /** Cosine similarity score (0-1, higher = more similar). */
+  similarity: number;
+}
+
 /**
  * Resource for AI-powered chat and document analysis.
  *
@@ -221,6 +233,50 @@ export class AiResource {
     const sessions = await this.listSessions();
     for (const session of sessions) {
       yield session;
+    }
+  }
+
+  async similar(params: {
+    documentId: string;
+    vaultId: string;
+    limit?: number;
+  }): Promise<{ similar: SimilarDocument[] }> {
+    try {
+      const searchParams: Record<string, string> = {
+        documentId: params.documentId,
+        vaultId: params.vaultId,
+      };
+      if (params.limit !== undefined) {
+        searchParams.limit = String(params.limit);
+      }
+      return await this.http.get('ai/similar', { searchParams }).json<{ similar: SimilarDocument[] }>();
+    } catch (error) {
+      throw await handleError(error, 'AI Similar', params.documentId);
+    }
+  }
+
+  async assist(params: {
+    vaultId: string;
+    text: string;
+    instruction: string;
+    context?: string;
+  }): Promise<{ result: string; tokensUsed: number }> {
+    try {
+      return await this.http.post('ai/assist', { json: params }).json<{ result: string; tokensUsed: number }>();
+    } catch (error) {
+      throw await handleError(error, 'AI Assist', '');
+    }
+  }
+
+  async suggest(params: {
+    vaultId: string;
+    documentPath: string;
+    type: 'grammar' | 'style' | 'expand' | 'shorten';
+  }): Promise<{ suggestion: string; type: string; tokensUsed: number }> {
+    try {
+      return await this.http.post('ai/suggest', { json: params }).json<{ suggestion: string; type: string; tokensUsed: number }>();
+    } catch (error) {
+      throw await handleError(error, 'AI Suggest', params.documentPath);
     }
   }
 }

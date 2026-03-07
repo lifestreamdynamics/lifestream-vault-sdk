@@ -156,4 +156,85 @@ describe('AiResource', () => {
       await expect(resource.summarize('v1', 'doc.md')).rejects.toBeInstanceOf(NetworkError);
     });
   });
+
+  describe('similar', () => {
+    it('should find similar documents', async () => {
+      const similarDocs = [
+        { id: 'd1', path: 'notes/a.md', title: 'Note A', similarity: 0.92 },
+        { id: 'd2', path: 'notes/b.md', title: null, similarity: 0.85 },
+      ];
+      mockJsonResponse(kyMock.get, { similar: similarDocs });
+
+      const result = await resource.similar({ documentId: 'doc1', vaultId: 'v1' });
+
+      expect(kyMock.get).toHaveBeenCalledWith('ai/similar', {
+        searchParams: { documentId: 'doc1', vaultId: 'v1' },
+      });
+      expect(result).toEqual({ similar: similarDocs });
+    });
+
+    it('should pass limit as string searchParam', async () => {
+      mockJsonResponse(kyMock.get, { similar: [] });
+
+      await resource.similar({ documentId: 'doc1', vaultId: 'v1', limit: 5 });
+
+      expect(kyMock.get).toHaveBeenCalledWith('ai/similar', {
+        searchParams: { documentId: 'doc1', vaultId: 'v1', limit: '5' },
+      });
+    });
+
+    it('should throw NotFoundError on 404', async () => {
+      mockHTTPError(kyMock.get, 404, { message: 'Document not found' });
+
+      await expect(resource.similar({ documentId: 'nonexistent', vaultId: 'v1' })).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
+  describe('assist', () => {
+    it('should return AI assistance result', async () => {
+      const assistResult = { result: 'Improved text here.', tokensUsed: 120 };
+      mockJsonResponse(kyMock.post, assistResult);
+
+      const result = await resource.assist({
+        vaultId: 'v1',
+        text: 'Some text to improve',
+        instruction: 'Make it more concise',
+      });
+
+      expect(kyMock.post).toHaveBeenCalledWith('ai/assist', {
+        json: { vaultId: 'v1', text: 'Some text to improve', instruction: 'Make it more concise' },
+      });
+      expect(result).toEqual(assistResult);
+    });
+
+    it('should throw AuthenticationError on 401', async () => {
+      mockHTTPError(kyMock.post, 401, { message: 'Unauthorized' });
+
+      await expect(resource.assist({ vaultId: 'v1', text: 'text', instruction: 'do something' })).rejects.toBeInstanceOf(AuthenticationError);
+    });
+  });
+
+  describe('suggest', () => {
+    it('should return AI writing suggestion', async () => {
+      const suggestResult = { suggestion: 'Consider rephrasing...', type: 'style', tokensUsed: 80 };
+      mockJsonResponse(kyMock.post, suggestResult);
+
+      const result = await resource.suggest({
+        vaultId: 'v1',
+        documentPath: 'notes/draft.md',
+        type: 'style',
+      });
+
+      expect(kyMock.post).toHaveBeenCalledWith('ai/suggest', {
+        json: { vaultId: 'v1', documentPath: 'notes/draft.md', type: 'style' },
+      });
+      expect(result).toEqual(suggestResult);
+    });
+
+    it('should throw NetworkError on network failure', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(resource.suggest({ vaultId: 'v1', documentPath: 'doc.md', type: 'grammar' })).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
 });

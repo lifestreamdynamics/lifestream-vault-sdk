@@ -5,6 +5,7 @@ export { DocumentsResource } from './resources/documents.js';
 export type { BulkOperationResult, DocumentVersion, DocumentVersionWithContent, VersionDiffResponse, ForwardLinkResult, BacklinkResult } from './resources/documents.js';
 export { SearchResource } from './resources/search.js';
 export { AiResource } from './resources/ai.js';
+export type { SimilarDocument } from './resources/ai.js';
 export { ApiKeysResource } from './resources/api-keys.js';
 export type { ApiKey, ApiKeyWithSecret, CreateApiKeyParams, UpdateApiKeyParams } from './resources/api-keys.js';
 export { UserResource } from './resources/user.js';

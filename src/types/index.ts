@@ -20,4 +20,4 @@ export type {
   BacklinkResult,
 } from '../resources/documents.js';
 export type { SearchResult, SearchResponse } from '../resources/search.js';
-export type { AiChatSession, AiChatMessage } from '../resources/ai.js';
+export type { AiChatSession, AiChatMessage, SimilarDocument } from '../resources/ai.js';
