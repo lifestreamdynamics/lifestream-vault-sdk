@@ -44,7 +44,7 @@ describe('VaultsResource', () => {
   describe('get', () => {
     it('should get a vault by id', async () => {
       const mockVault = { id: 'v1', name: 'My Vault', slug: 'my-vault', description: 'desc', createdAt: '2024-01-01', updatedAt: '2024-01-01' };
-      mockJsonResponse(kyMock.get, mockVault);
+      mockJsonResponse(kyMock.get, { vault: mockVault });
 
       const result = await resource.get('v1');
 
@@ -62,7 +62,7 @@ describe('VaultsResource', () => {
   describe('create', () => {
     it('should create a vault with name only', async () => {
       const mockVault = { id: 'v2', name: 'New Vault', slug: 'new-vault', description: null, createdAt: '2024-01-01', updatedAt: '2024-01-01' };
-      mockJsonResponse(kyMock.post, mockVault);
+      mockJsonResponse(kyMock.post, { vault: mockVault });
 
       const result = await resource.create({ name: 'New Vault' });
 
@@ -72,7 +72,7 @@ describe('VaultsResource', () => {
 
     it('should create a vault with name and description', async () => {
       const mockVault = { id: 'v3', name: 'Described', slug: 'described', description: 'A vault', createdAt: '2024-01-01', updatedAt: '2024-01-01' };
-      mockJsonResponse(kyMock.post, mockVault);
+      mockJsonResponse(kyMock.post, { vault: mockVault });
 
       const result = await resource.create({ name: 'Described', description: 'A vault' });
 
@@ -84,7 +84,7 @@ describe('VaultsResource', () => {
   describe('update', () => {
     it('should update vault name using patch', async () => {
       const mockVault = { id: 'v1', name: 'Updated', slug: 'updated', description: null, createdAt: '2024-01-01', updatedAt: '2024-01-02' };
-      mockJsonResponse(kyMock.patch, mockVault);
+      mockJsonResponse(kyMock.patch, { vault: mockVault });
 
       const result = await resource.update('v1', { name: 'Updated' });
 
@@ -94,7 +94,7 @@ describe('VaultsResource', () => {
 
     it('should update vault description to null', async () => {
       const mockVault = { id: 'v1', name: 'Test', slug: 'test', description: null, createdAt: '2024-01-01', updatedAt: '2024-01-02' };
-      mockJsonResponse(kyMock.patch, mockVault);
+      mockJsonResponse(kyMock.patch, { vault: mockVault });
 
       await resource.update('v1', { description: null });
 

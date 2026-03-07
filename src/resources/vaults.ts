@@ -148,7 +148,8 @@ export class VaultsResource {
    */
   async get(vaultId: string): Promise<Vault> {
     try {
-      return await this.http.get(`vaults/${vaultId}`).json<Vault>();
+      const data = await this.http.get(`vaults/${vaultId}`).json<{ vault: Vault }>();
+      return data.vault;
     } catch (error) {
       throw await handleError(error, 'Vault', vaultId);
     }
@@ -180,7 +181,8 @@ export class VaultsResource {
    */
   async create(params: { name: string; description?: string; encryptionEnabled?: boolean }): Promise<Vault> {
     try {
-      return await this.http.post('vaults', { json: params }).json<Vault>();
+      const data = await this.http.post('vaults', { json: params }).json<{ vault: Vault }>();
+      return data.vault;
     } catch (error) {
       throw await handleError(error, 'Vault', params.name);
     }
@@ -214,7 +216,8 @@ export class VaultsResource {
    */
   async update(vaultId: string, params: { name?: string; description?: string | null }): Promise<Vault> {
     try {
-      return await this.http.patch(`vaults/${vaultId}`, { json: params }).json<Vault>();
+      const data = await this.http.patch(`vaults/${vaultId}`, { json: params }).json<{ vault: Vault }>();
+      return data.vault;
     } catch (error) {
       throw await handleError(error, 'Vault', vaultId);
     }

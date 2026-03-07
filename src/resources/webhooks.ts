@@ -9,7 +9,7 @@ export interface Webhook {
   vaultId: string;
   /** URL that receives webhook deliveries. */
   url: string;
-  /** Event types this webhook subscribes to (e.g., `['create', 'update', 'delete']`). */
+  /** Event types this webhook subscribes to (e.g., `['document.created', 'document.updated', 'document.deleted', 'document.moved']`). */
   events: string[];
   /** Whether the webhook is currently active. */
   isActive: boolean;
@@ -53,7 +53,7 @@ export interface WebhookDelivery {
 export interface CreateWebhookParams {
   /** URL to receive webhook deliveries. Must be a publicly accessible HTTPS endpoint. */
   url: string;
-  /** Event types to subscribe to (e.g., `['create', 'update', 'delete']`). */
+  /** Event types to subscribe to (e.g., `['document.created', 'document.updated', 'document.deleted', 'document.moved']`). */
   events: string[];
 }
 
@@ -80,7 +80,7 @@ export interface UpdateWebhookParams {
  * const webhooks = await client.webhooks.list('vault-123');
  * const webhook = await client.webhooks.create('vault-123', {
  *   url: 'https://example.com/webhook',
- *   events: ['create', 'update'],
+ *   events: ['document.created', 'document.updated'],
  * });
  * console.log('Save this secret:', webhook.secret);
  * ```
@@ -133,7 +133,7 @@ export class WebhooksResource {
    * ```typescript
    * const webhook = await client.webhooks.create('vault-123', {
    *   url: 'https://example.com/webhook',
-   *   events: ['create', 'update', 'delete'],
+   *   events: ['document.created', 'document.updated', 'document.deleted'],
    * });
    * console.log('Save this secret:', webhook.secret);
    * ```
