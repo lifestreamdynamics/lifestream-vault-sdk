@@ -7,8 +7,12 @@ const mockDomain = {
   id: 'dom1',
   userId: 'u1',
   domain: 'docs.example.com',
-  verified: false,
   verificationToken: 'tok_abc123',
+  status: 'pending' as const,
+  sslStatus: 'pending' as const,
+  verificationAttempts: 0,
+  lastVerifiedAt: null,
+  verifiedAt: null,
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
 };
@@ -55,7 +59,7 @@ describe('CustomDomainsResource', () => {
 
       expect(kyMock.post).toHaveBeenCalledWith('custom-domains', { json: { domain: 'docs.example.com' } });
       expect(result).toEqual(mockDomain);
-      expect(result.verified).toBe(false);
+      expect(result.status).toBe('pending');
     });
 
     it('should throw ConflictError if domain already exists', async () => {
@@ -91,16 +95,16 @@ describe('CustomDomainsResource', () => {
   describe('update', () => {
     it('should update a custom domain', async () => {
       const updated = { ...mockDomain, domain: 'api.example.com' };
-      mockJsonResponse(kyMock.patch, { domain: updated });
+      mockJsonResponse(kyMock.put, { domain: updated });
 
       const result = await resource.update('dom1', { domain: 'api.example.com' });
 
-      expect(kyMock.patch).toHaveBeenCalledWith('custom-domains/dom1', { json: { domain: 'api.example.com' } });
+      expect(kyMock.put).toHaveBeenCalledWith('custom-domains/dom1', { json: { domain: 'api.example.com' } });
       expect(result.domain).toBe('api.example.com');
     });
 
     it('should throw NotFoundError on 404', async () => {
-      mockHTTPError(kyMock.patch, 404, { message: 'Domain not found' });
+      mockHTTPError(kyMock.put, 404, { message: 'Domain not found' });
 
       await expect(resource.update('nonexistent', { domain: 'x.com' })).rejects.toBeInstanceOf(NotFoundError);
     });
@@ -122,13 +126,13 @@ describe('CustomDomainsResource', () => {
 
   describe('verify', () => {
     it('should verify a custom domain and return the verified domain', async () => {
-      const verifiedDomain = { ...mockDomain, verified: true };
+      const verifiedDomain = { ...mockDomain, status: 'verified' as const, verifiedAt: '2024-01-02' };
       mockJsonResponse(kyMock.post, { domain: verifiedDomain });
 
       const result = await resource.verify('dom1');
 
       expect(kyMock.post).toHaveBeenCalledWith('custom-domains/dom1/verify');
-      expect(result.verified).toBe(true);
+      expect(result.status).toBe('verified');
     });
 
     it('should throw NetworkError on network failure', async () => {
@@ -139,34 +143,48 @@ describe('CustomDomainsResource', () => {
   });
 
   describe('checkDns', () => {
-    it('should check DNS resolution for a domain', async () => {
-      const dnsResult = {
+    it('should check DNS records for a domain and return a DnsCheckResponse', async () => {
+      const dnsResponse = {
         domain: 'docs.example.com',
-        resolved: true,
-        expectedValue: 'lsvault-verify=tok_abc123',
-        actualValue: 'lsvault-verify=tok_abc123',
+        checks: [
+          {
+            type: 'TXT',
+            hostname: '_verify.docs.example.com',
+            expected: 'lsvault-verify=tok_abc123',
+            found: ['lsvault-verify=tok_abc123'],
+            status: 'pass',
+          },
+        ],
       };
-      mockJsonResponse(kyMock.get, dnsResult);
+      mockJsonResponse(kyMock.post, dnsResponse);
 
       const result = await resource.checkDns('dom1');
 
-      expect(kyMock.get).toHaveBeenCalledWith('custom-domains/dom1/check');
-      expect(result.resolved).toBe(true);
+      expect(kyMock.post).toHaveBeenCalledWith('custom-domains/dom1/check');
       expect(result.domain).toBe('docs.example.com');
+      expect(result.checks).toHaveLength(1);
+      expect(result.checks[0].status).toBe('pass');
     });
 
-    it('should return unresolved when DNS is not set up', async () => {
-      const dnsResult = {
+    it('should return failing checks when DNS records are not set up', async () => {
+      const dnsResponse = {
         domain: 'docs.example.com',
-        resolved: false,
-        expectedValue: 'lsvault-verify=tok_abc123',
+        checks: [
+          {
+            type: 'TXT',
+            hostname: '_verify.docs.example.com',
+            expected: 'lsvault-verify=tok_abc123',
+            found: [],
+            status: 'fail',
+          },
+        ],
       };
-      mockJsonResponse(kyMock.get, dnsResult);
+      mockJsonResponse(kyMock.post, dnsResponse);
 
       const result = await resource.checkDns('dom1');
 
-      expect(result.resolved).toBe(false);
-      expect(result.actualValue).toBeUndefined();
+      expect(result.checks[0].status).toBe('fail');
+      expect(result.checks[0].found).toHaveLength(0);
     });
   });
 });

@@ -1,6 +1,12 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
 
+/** Verification lifecycle state of a custom domain. */
+export type CustomDomainStatus = 'pending' | 'verified' | 'failed';
+
+/** SSL provisioning state of a custom domain. */
+export type CustomDomainSslStatus = 'pending' | 'provisioning' | 'active' | 'failed';
+
 /** A custom domain mapped to a published vault. */
 export interface CustomDomain {
   /** Unique domain identifier. */
@@ -9,22 +15,37 @@ export interface CustomDomain {
   userId: string;
   /** The domain name (e.g., `docs.example.com`). */
   domain: string;
-  /** Whether the domain has been verified via DNS. */
-  verified: boolean;
   /** TXT record value to add to DNS for verification. */
   verificationToken: string;
+  /** Current verification lifecycle state of the domain. */
+  status: CustomDomainStatus;
+  /** Current SSL provisioning state of the domain. */
+  sslStatus: CustomDomainSslStatus;
+  /** Number of DNS verification attempts made. */
+  verificationAttempts: number;
+  /** ISO 8601 timestamp of the most recent verification attempt, or null. */
+  lastVerifiedAt: string | null;
+  /** ISO 8601 timestamp when the domain was successfully verified, or null. */
+  verifiedAt: string | null;
   /** ISO 8601 creation timestamp. */
   createdAt: string;
   /** ISO 8601 last-updated timestamp. */
   updatedAt: string;
 }
 
-/** Result of a DNS check for a custom domain. */
+/** Result of a single DNS record check for a custom domain. */
 export interface DnsCheckResult {
+  type: 'TXT' | 'CNAME' | 'A';
+  hostname: string;
+  expected: string;
+  found: string[];
+  status: 'pass' | 'fail';
+}
+
+/** Response from the DNS check endpoint containing all record checks for a domain. */
+export interface DnsCheckResponse {
   domain: string;
-  resolved: boolean;
-  expectedValue: string;
-  actualValue?: string;
+  checks: DnsCheckResult[];
 }
 
 /**
@@ -109,7 +130,7 @@ export class CustomDomainsResource {
    */
   async update(domainId: string, params: { domain: string }): Promise<CustomDomain> {
     try {
-      const data = await this.http.patch(`custom-domains/${domainId}`, { json: params }).json<{ domain: CustomDomain }>();
+      const data = await this.http.put(`custom-domains/${domainId}`, { json: params }).json<{ domain: CustomDomain }>();
       return data.domain;
     } catch (error) {
       throw await handleError(error, 'CustomDomain', domainId);
@@ -136,11 +157,11 @@ export class CustomDomainsResource {
    * Triggers DNS verification for a custom domain.
    *
    * The domain must have the `verificationToken` TXT record added to its
-   * DNS before calling this method. On success, the domain's `verified`
-   * flag is set to `true`.
+   * DNS before calling this method. On success, the domain's `status`
+   * is set to `'verified'`.
    *
    * @param domainId - The unique identifier of the custom domain to verify
-   * @returns The updated domain with `verified: true` on success
+   * @returns The updated domain with `status: 'verified'` on success
    * @throws {NotFoundError} If no domain exists with the given ID
    * @throws {ValidationError} If the DNS TXT record is not found or incorrect
    * @throws {AuthenticationError} If the request is not authenticated
@@ -158,18 +179,18 @@ export class CustomDomainsResource {
   /**
    * Checks the current DNS resolution status of a custom domain.
    *
-   * Use this to check whether the TXT record has propagated before calling
-   * `verify()`. Does not modify the domain's `verified` state.
+   * Use this to check whether the required DNS records have propagated before
+   * calling `verify()`. Does not modify the domain's `status`.
    *
    * @param domainId - The unique identifier of the custom domain to check
-   * @returns DNS check result with resolution status and expected vs actual values
+   * @returns DNS check response containing per-record results with expected vs found values
    * @throws {NotFoundError} If no domain exists with the given ID
    * @throws {AuthenticationError} If the request is not authenticated
    * @throws {NetworkError} If the request fails due to network issues
    */
-  async checkDns(domainId: string): Promise<DnsCheckResult> {
+  async checkDns(domainId: string): Promise<DnsCheckResponse> {
     try {
-      return await this.http.get(`custom-domains/${domainId}/check`).json<DnsCheckResult>();
+      return await this.http.post(`custom-domains/${domainId}/check`).json<DnsCheckResponse>();
     } catch (error) {
       throw await handleError(error, 'CustomDomain', domainId);
     }

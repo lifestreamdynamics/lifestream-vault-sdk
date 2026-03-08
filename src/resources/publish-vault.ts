@@ -142,7 +142,7 @@ export class PublishVaultResource {
    */
   async update(vaultId: string, params: Partial<PublishVaultParams>): Promise<PublishedVault> {
     try {
-      const data = await this.http.patch(`vaults/${vaultId}/publish-vault`, { json: params }).json<{ publishedVault: PublishedVault }>();
+      const data = await this.http.put(`vaults/${vaultId}/publish-vault`, { json: params }).json<{ publishedVault: PublishedVault }>();
       return data.publishedVault;
     } catch (error) {
       throw await handleError(error, 'PublishedVault', vaultId);

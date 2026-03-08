@@ -106,7 +106,7 @@ export type {
   AddGroupMemberInput,
 } from './resources/team-booking-groups.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
-export type { CustomDomain, DnsCheckResult } from './resources/custom-domains.js';
+export type { CustomDomain, CustomDomainStatus, CustomDomainSslStatus, DnsCheckResult, DnsCheckResponse } from './resources/custom-domains.js';
 export { AnalyticsResource } from './resources/analytics.js';
 export type { PublishedSummary, ShareAnalytics, PublishedDocAnalytics } from './resources/analytics.js';
 export { PublishVaultResource } from './resources/publish-vault.js';

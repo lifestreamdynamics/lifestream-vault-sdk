@@ -61,10 +61,10 @@ describe('PublishVaultResource', () => {
     expect(result).toEqual(mockPublishedVault);
   });
 
-  it('update() patches and unwraps updated published vault', async () => {
+  it('update() puts and unwraps updated published vault', async () => {
     kyMock._json.mockResolvedValue({ publishedVault: { ...mockPublishedVault, title: 'Updated' } });
     const result = await resource.update('v1', { title: 'Updated' });
-    expect(kyMock.patch).toHaveBeenCalledWith('vaults/v1/publish-vault', { json: { title: 'Updated' } });
+    expect(kyMock.put).toHaveBeenCalledWith('vaults/v1/publish-vault', { json: { title: 'Updated' } });
     expect(result.title).toBe('Updated');
   });
 
