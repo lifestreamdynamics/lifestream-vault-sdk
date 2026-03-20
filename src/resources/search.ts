@@ -9,6 +9,8 @@ export interface SearchResult {
   vaultId: string;
   /** Name of the vault containing the document. */
   vaultName: string;
+  /** URL slug of the vault. */
+  vaultSlug: string;
   /** File path of the matched document. */
   path: string;
   /** Document title, if available. */

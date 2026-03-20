@@ -17,7 +17,7 @@ describe('SearchResource', () => {
       const mockResponse = {
         results: [
           {
-            documentId: 'd1', vaultId: 'v1', vaultName: 'Main', path: 'hello.md',
+            documentId: 'd1', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'hello.md',
             title: 'Hello', snippet: '...match...', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01',
           },
         ],
@@ -117,11 +117,11 @@ describe('SearchResource', () => {
       const mockResponse = {
         results: [
           {
-            documentId: 'd1', vaultId: 'v1', vaultName: 'Main', path: 'hello.md',
+            documentId: 'd1', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'hello.md',
             title: 'Hello', snippet: '...match...', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01',
           },
           {
-            documentId: 'd2', vaultId: 'v1', vaultName: 'Main', path: 'world.md',
+            documentId: 'd2', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'world.md',
             title: 'World', snippet: '...other...', tags: [], rank: 0.8, fileModifiedAt: '2024-01-02',
           },
         ],
@@ -143,15 +143,15 @@ describe('SearchResource', () => {
     it('should page through results until fewer than pageSize are returned', async () => {
       const page1Result = {
         results: [
-          { documentId: 'd1', vaultId: 'v1', vaultName: 'Main', path: 'a.md', title: 'A', snippet: '', tags: [], rank: 1.0, fileModifiedAt: '2024-01-01' },
-          { documentId: 'd2', vaultId: 'v1', vaultName: 'Main', path: 'b.md', title: 'B', snippet: '', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01' },
+          { documentId: 'd1', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'a.md', title: 'A', snippet: '', tags: [], rank: 1.0, fileModifiedAt: '2024-01-01' },
+          { documentId: 'd2', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'b.md', title: 'B', snippet: '', tags: [], rank: 0.9, fileModifiedAt: '2024-01-01' },
         ],
         total: 3,
         query: 'test',
       };
       const page2Result = {
         results: [
-          { documentId: 'd3', vaultId: 'v1', vaultName: 'Main', path: 'c.md', title: 'C', snippet: '', tags: [], rank: 0.8, fileModifiedAt: '2024-01-01' },
+          { documentId: 'd3', vaultId: 'v1', vaultName: 'Main', vaultSlug: 'main', path: 'c.md', title: 'C', snippet: '', tags: [], rank: 0.8, fileModifiedAt: '2024-01-01' },
         ],
         total: 3,
         query: 'test',
