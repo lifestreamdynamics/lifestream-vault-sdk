@@ -176,8 +176,7 @@ const client = new LifestreamVaultClient({
   refreshToken: 'your_refresh_token', // Optional but recommended
   refreshBufferMs: 60000, // Refresh 60s before expiry (default)
   onTokenRefresh: (tokens) => {
-    // Save new tokens to your storage
-    localStorage.setItem('accessToken', tokens.accessToken);
+    // Persist tokens securely (avoid localStorage — prefer httpOnly cookies or in-memory storage)
   },
 });
 ```
@@ -909,8 +908,7 @@ const client = new LifestreamVaultClient({
   refreshToken: 'refresh_token_here',
   refreshBufferMs: 120000, // Refresh 2 minutes before expiry
   onTokenRefresh: (tokens) => {
-    // Persist new tokens
-    localStorage.setItem('accessToken', tokens.accessToken);
+    // Persist tokens securely (avoid localStorage — prefer httpOnly cookies or in-memory storage)
     console.log('Tokens refreshed successfully');
   },
 });
