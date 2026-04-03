@@ -88,6 +88,8 @@ export interface BacklinkResult {
 
 /** Summary information for a document in a listing. */
 export interface DocumentListItem {
+  /** Unique document identifier. */
+  id: string;
   /** File path relative to the vault root. */
   path: string;
   /** Document title, if available. */
