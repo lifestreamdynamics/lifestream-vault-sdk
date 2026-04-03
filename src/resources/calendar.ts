@@ -549,8 +549,8 @@ export class CalendarResource {
    */
   async toggleComplete(vaultId: string, documentPath: string, completed: boolean): Promise<DocumentDueResponse> {
     try {
-      return await this.http.patch(`vaults/${vaultId}/documents/${documentPath}`, {
-        json: { completedAt: completed ? new Date().toISOString() : null },
+      return await this.http.patch(`vaults/${vaultId}/documents/${documentPath}/complete`, {
+        json: { completed },
       }).json<DocumentDueResponse>();
     } catch (error) {
       throw await handleError(error, 'Toggle Complete', documentPath);

@@ -12,9 +12,9 @@ export interface User {
   /** User role (`user` or `admin`). */
   role: string;
   /** Current subscription tier (`free`, `pro`, or `business`). */
-  subscriptionTier: string;
+  subscriptionTier?: string;
   /** ISO 8601 subscription expiry timestamp, or `null` for free tier. */
-  subscriptionExpiresAt: string | null;
+  subscriptionExpiresAt?: string | null;
   /** ISO 8601 account creation timestamp. */
   createdAt: string;
   /** ISO 8601 last-updated timestamp. */
@@ -385,8 +385,11 @@ export class UserResource {
    */
   async getConsents(): Promise<ConsentRecord[]> {
     try {
-      const data = await this.http.get('account/consents').json<{ consents: ConsentRecord[] }>();
-      return data.consents;
+      const data = await this.http.get('account/consents').json<{ consents: Record<string, ConsentRecord[]> | ConsentRecord[] }>();
+      const raw = data.consents;
+      if (Array.isArray(raw)) return raw;
+      // API returns grouped object: { "terms_of_service": [...], "privacy_policy": [...] }
+      return Object.values(raw).flat();
     } catch (error) {
       throw await handleError(error, 'User', '');
     }

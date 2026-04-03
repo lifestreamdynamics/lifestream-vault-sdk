@@ -244,10 +244,10 @@ describe('DocumentsResource', () => {
       };
       mockJsonResponse(kyMock.post, mockResult);
 
-      const result = await resource.bulkMove('v1', { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'archive/' });
+      const result = await resource.bulkMove('v1', { items: ['notes/a.md', 'notes/b.md'], destination: 'archive/' });
 
       expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-move', {
-        json: { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'archive/' },
+        json: { items: ['notes/a.md', 'notes/b.md'], destination: 'archive/' },
       });
       expect(result.succeeded).toHaveLength(2);
       expect(result.failed).toHaveLength(0);
@@ -260,7 +260,7 @@ describe('DocumentsResource', () => {
       };
       mockJsonResponse(kyMock.post, mockResult);
 
-      const result = await resource.bulkMove('v1', { paths: ['notes/a.md', 'notes/missing.md'], targetDirectory: 'archive/' });
+      const result = await resource.bulkMove('v1', { items: ['notes/a.md', 'notes/missing.md'], destination: 'archive/' });
 
       expect(result.succeeded).toEqual(['notes/a.md']);
       expect(result.failed[0].path).toBe('notes/missing.md');
@@ -275,10 +275,10 @@ describe('DocumentsResource', () => {
       };
       mockJsonResponse(kyMock.post, mockResult);
 
-      const result = await resource.bulkCopy('v1', { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'backup/' });
+      const result = await resource.bulkCopy('v1', { items: ['notes/a.md', 'notes/b.md'], destination: 'backup/' });
 
       expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-copy', {
-        json: { paths: ['notes/a.md', 'notes/b.md'], targetDirectory: 'backup/' },
+        json: { items: ['notes/a.md', 'notes/b.md'], destination: 'backup/' },
       });
       expect(result.succeeded).toHaveLength(2);
     });
@@ -292,10 +292,10 @@ describe('DocumentsResource', () => {
       };
       mockJsonResponse(kyMock.post, mockResult);
 
-      const result = await resource.bulkDelete('v1', { paths: ['old/a.md', 'old/b.md'] });
+      const result = await resource.bulkDelete('v1', { items: ['old/a.md', 'old/b.md'] });
 
       expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-delete', {
-        json: { paths: ['old/a.md', 'old/b.md'] },
+        json: { items: ['old/a.md', 'old/b.md'] },
       });
       expect(result.succeeded).toEqual(['old/a.md', 'old/b.md']);
     });
@@ -310,13 +310,13 @@ describe('DocumentsResource', () => {
       mockJsonResponse(kyMock.post, mockResult);
 
       const result = await resource.bulkTag('v1', {
-        paths: ['notes/a.md', 'notes/b.md'],
+        items: ['notes/a.md', 'notes/b.md'],
         addTags: ['archived'],
         removeTags: ['draft'],
       });
 
       expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-tag', {
-        json: { paths: ['notes/a.md', 'notes/b.md'], addTags: ['archived'], removeTags: ['draft'] },
+        json: { items: ['notes/a.md', 'notes/b.md'], addTags: ['archived'], removeTags: ['draft'] },
       });
       expect(result.succeeded).toHaveLength(2);
     });
@@ -488,7 +488,7 @@ describe('DocumentsResource', () => {
       const result = await resource.deleteMany('v1', ['old/a.md', 'old/b.md']);
 
       expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-delete', {
-        json: { paths: ['old/a.md', 'old/b.md'] },
+        json: { items: ['old/a.md', 'old/b.md'] },
       });
       expect(result.succeeded).toEqual(['old/a.md', 'old/b.md']);
       expect(result.failed).toHaveLength(0);

@@ -511,7 +511,7 @@ export class TeamsResource {
       const searchParams: Record<string, string> = {};
       if (params?.status) searchParams.status = params.status;
       const data = await this.http.get(`teams/${teamId}/calendar/due`, { searchParams }).json<{ dueDocs: DueDocument[] }>();
-      return data.dueDocs;
+      return data.dueDocs ?? [];
     } catch (error) {
       throw await handleError(error, 'Team Due Documents', teamId);
     }

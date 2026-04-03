@@ -142,10 +142,17 @@ export class DocumentsResource {
    * const notes = await client.documents.list('vault-uuid', 'notes/');
    * ```
    */
-  async list(vaultId: string, dirPath?: string): Promise<DocumentListItem[]> {
+  async list(
+    vaultId: string,
+    dirPath?: string,
+    options?: { limit?: number; offset?: number; tags?: string[] },
+  ): Promise<DocumentListItem[]> {
     try {
-      const searchParams: Record<string, string> = {};
+      const searchParams: Record<string, string | number> = {};
       if (dirPath) searchParams.dir = dirPath;
+      if (options?.limit !== undefined) searchParams.limit = options.limit;
+      if (options?.offset !== undefined) searchParams.offset = options.offset;
+      if (options?.tags && options.tags.length > 0) searchParams.tags = options.tags.join(',');
       const data = await this.http.get(`vaults/${vaultId}/documents`, { searchParams }).json<{ documents: DocumentListItem[] }>();
       return data.documents;
     } catch (error) {
@@ -531,7 +538,7 @@ export class DocumentsResource {
     }
   }
 
-  async bulkMove(vaultId: string, params: { paths: string[]; targetDirectory: string }): Promise<BulkOperationResult> {
+  async bulkMove(vaultId: string, params: { items: string[]; destination: string }): Promise<BulkOperationResult> {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/bulk-move`, { json: params }).json<BulkOperationResult>();
     } catch (error) {
@@ -539,7 +546,7 @@ export class DocumentsResource {
     }
   }
 
-  async bulkCopy(vaultId: string, params: { paths: string[]; targetDirectory: string }): Promise<BulkOperationResult> {
+  async bulkCopy(vaultId: string, params: { items: string[]; destination: string }): Promise<BulkOperationResult> {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/bulk-copy`, { json: params }).json<BulkOperationResult>();
     } catch (error) {
@@ -547,7 +554,7 @@ export class DocumentsResource {
     }
   }
 
-  async bulkDelete(vaultId: string, params: { paths: string[] }): Promise<BulkOperationResult> {
+  async bulkDelete(vaultId: string, params: { items: string[] }): Promise<BulkOperationResult> {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/bulk-delete`, { json: params }).json<BulkOperationResult>();
     } catch (error) {
@@ -555,7 +562,7 @@ export class DocumentsResource {
     }
   }
 
-  async bulkTag(vaultId: string, params: { paths: string[]; addTags?: string[]; removeTags?: string[] }): Promise<BulkOperationResult> {
+  async bulkTag(vaultId: string, params: { items: string[]; addTags?: string[]; removeTags?: string[] }): Promise<BulkOperationResult> {
     try {
       return await this.http.post(`vaults/${vaultId}/documents/bulk-tag`, { json: params }).json<BulkOperationResult>();
     } catch (error) {
@@ -637,6 +644,6 @@ export class DocumentsResource {
    * @returns Result with succeeded and failed paths
    */
   async deleteMany(vaultId: string, paths: string[]): Promise<BulkOperationResult> {
-    return this.bulkDelete(vaultId, { paths });
+    return this.bulkDelete(vaultId, { items: paths });
   }
 }

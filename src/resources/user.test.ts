@@ -202,16 +202,33 @@ describe('UserResource', () => {
   });
 
   describe('getConsents', () => {
-    it('should get consent records and unwrap consents array', async () => {
+    it('should flatten grouped consent records returned by the API', async () => {
+      mockJsonResponse(kyMock.get, {
+        consents: {
+          'terms_of_service': [{ consentType: 'terms_of_service', version: '1.0', granted: true, recordedAt: '2026-01-01' }],
+          'privacy_policy': [{ consentType: 'privacy_policy', version: '1.0', granted: true, recordedAt: '2026-01-01' }],
+        },
+      });
+
+      const result = await resource.getConsents();
+
+      expect(kyMock.get).toHaveBeenCalledWith('account/consents');
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toHaveLength(2);
+      expect(result.map((r) => r.consentType)).toEqual(
+        expect.arrayContaining(['terms_of_service', 'privacy_policy']),
+      );
+    });
+
+    it('should pass through when API returns a flat array', async () => {
       const consents = [
-        { consentType: 'tos', version: '1.0', granted: true, recordedAt: '2024-01-01' },
-        { consentType: 'privacy_policy', version: '1.0', granted: true, recordedAt: '2024-01-01' },
+        { consentType: 'terms_of_service', version: '1.0', granted: true, recordedAt: '2026-01-01' },
+        { consentType: 'privacy_policy', version: '1.0', granted: true, recordedAt: '2026-01-01' },
       ];
       mockJsonResponse(kyMock.get, { consents });
 
       const result = await resource.getConsents();
 
-      expect(kyMock.get).toHaveBeenCalledWith('account/consents');
       expect(result).toEqual(consents);
       expect(result).toHaveLength(2);
     });

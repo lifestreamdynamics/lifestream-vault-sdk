@@ -56,7 +56,7 @@ export class AnalyticsResource {
    */
   async getPublishedSummary(): Promise<PublishedSummary> {
     try {
-      return await this.http.get('analytics/published').json<PublishedSummary>();
+      return await this.http.get('analytics/published/summary').json<PublishedSummary>();
     } catch (error) {
       throw await handleError(error, 'PublishedSummary');
     }

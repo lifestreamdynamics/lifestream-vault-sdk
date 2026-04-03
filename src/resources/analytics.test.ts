@@ -27,7 +27,7 @@ describe('AnalyticsResource', () => {
 
       const result = await resource.getPublishedSummary();
 
-      expect(kyMock.get).toHaveBeenCalledWith('analytics/published');
+      expect(kyMock.get).toHaveBeenCalledWith('analytics/published/summary');
       expect(result.totalPublished).toBe(3);
       expect(result.totalViews).toBe(1500);
       expect(result.documents).toHaveLength(3);
