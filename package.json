@@ -3,7 +3,7 @@
   "version": "2.1.6",
   "description": "Official TypeScript SDK for Lifestream Vault API",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "type": "module",
   "main": "dist/index.js",
