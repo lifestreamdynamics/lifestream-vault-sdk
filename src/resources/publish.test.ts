@@ -56,6 +56,21 @@ describe('PublishResource', () => {
 
       await expect(resource.listMine('v1')).rejects.toBeInstanceOf(NetworkError);
     });
+
+    it('wraps a bare object response in an array via ensureArray', async () => {
+      const bareDoc = {
+        id: '1', documentId: 'd1', vaultId: 'v1', publishedBy: 'u1',
+        slug: 'test', seoTitle: null, seoDescription: null,
+        ogImage: null, isPublished: true, publishedAt: '2024-01-01',
+        updatedAt: '2024-01-01', documentPath: 'blog/post.md', documentTitle: 'Test',
+      };
+      mockJsonResponse(kyMock.get, { publishedDocs: bareDoc });
+
+      const result = await resource.listMine('v1');
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([bareDoc]);
+    });
   });
 
   describe('create', () => {

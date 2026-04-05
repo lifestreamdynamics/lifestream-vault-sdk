@@ -1,5 +1,6 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import { ensureArray } from '../utils/ensure-array.js';
 import type { Vault } from './vaults.js';
 import type { CalendarResponse, CalendarActivityResponse, CalendarEvent, UpcomingResponse, AgendaResponse, DueDocument } from './calendar.js';
 
@@ -244,7 +245,7 @@ export class TeamsResource {
   async listMembers(teamId: string): Promise<TeamMember[]> {
     try {
       const data = await this.http.get(`teams/${teamId}/members`).json<{ members: TeamMember[] }>();
-      return data.members;
+      return ensureArray(data.members);
     } catch (error) {
       throw await handleError(error, 'Team', teamId);
     }

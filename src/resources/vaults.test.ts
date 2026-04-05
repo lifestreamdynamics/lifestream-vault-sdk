@@ -33,6 +33,16 @@ describe('VaultsResource', () => {
       expect(result).toEqual([]);
     });
 
+    it('should pass includeArchived: true as searchParam', async () => {
+      mockJsonResponse(kyMock.get, { vaults: [] });
+
+      await resource.list({ includeArchived: true });
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults', {
+        searchParams: { includeArchived: 'true' },
+      });
+    });
+
     it('should throw NetworkError on network failure', async () => {
       mockNetworkError(kyMock.get);
 

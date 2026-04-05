@@ -163,6 +163,19 @@ describe('TeamsResource', () => {
 
       await expect(resource.listMembers('nonexistent')).rejects.toBeInstanceOf(NotFoundError);
     });
+
+    it('wraps a bare object response in an array via ensureArray', async () => {
+      const bareMember = {
+        id: 'm1', teamId: 't1', userId: 'u1', role: 'owner', joinedAt: '2024-01-01',
+        user: { id: 'u1', email: 'owner@test.com', displayName: 'Owner' },
+      };
+      mockJsonResponse(kyMock.get, { members: bareMember });
+
+      const result = await resource.listMembers('t1');
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([bareMember]);
+    });
   });
 
   describe('updateMemberRole', () => {

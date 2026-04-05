@@ -110,6 +110,8 @@ export class VaultsResource {
   /**
    * Lists all vaults accessible to the authenticated user.
    *
+   * @param options - Optional query parameters
+   * @param options.includeArchived - When `true`, includes archived vaults in the response. Default: `false`.
    * @returns Array of vault objects
    * @throws {AuthenticationError} If the request is not authenticated
    * @throws {NetworkError} If the request fails due to network issues
@@ -120,11 +122,17 @@ export class VaultsResource {
    * for (const vault of vaults) {
    *   console.log(vault.name, vault.slug);
    * }
+   *
+   * // Include archived vaults
+   * const all = await client.vaults.list({ includeArchived: true });
    * ```
    */
-  async list(): Promise<Vault[]> {
+  async list(options?: { includeArchived?: boolean }): Promise<Vault[]> {
     try {
-      const data = await this.http.get('vaults').json<{ vaults: Vault[] }>();
+      const request = options?.includeArchived
+        ? this.http.get('vaults', { searchParams: { includeArchived: 'true' } })
+        : this.http.get('vaults');
+      const data = await request.json<{ vaults: Vault[] }>();
       return data.vaults;
     } catch (error) {
       throw await handleError(error, 'Vaults', '');
@@ -514,10 +522,12 @@ export class VaultsResource {
    * Note: The vaults list endpoint doesn't paginate today, so this yields all
    * results in a single batch. It exists for API consistency with other listAll() methods.
    *
+   * @param options - Optional query parameters forwarded to `list()`
+   * @param options.includeArchived - When `true`, includes archived vaults. Default: `false`.
    * @yields Vault objects
    */
-  async *listAll(): AsyncGenerator<Vault> {
-    const vaults = await this.list();
+  async *listAll(options?: { includeArchived?: boolean }): AsyncGenerator<Vault> {
+    const vaults = await this.list(options);
     for (const vault of vaults) {
       yield vault;
     }

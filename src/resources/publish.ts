@@ -1,5 +1,6 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import { ensureArray } from '../utils/ensure-array.js';
 
 /** A published document with SEO metadata. */
 export interface PublishedDocument {
@@ -107,7 +108,7 @@ export class PublishResource {
       const data = await this.http
         .get(`vaults/${vaultId}/publish/my`)
         .json<{ publishedDocs: PublishedDocumentWithMeta[] }>();
-      return data.publishedDocs;
+      return ensureArray(data.publishedDocs);
     } catch (error) {
       throw await handleError(error, 'Published Documents', '');
     }

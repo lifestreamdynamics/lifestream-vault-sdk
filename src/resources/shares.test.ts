@@ -59,6 +59,20 @@ describe('SharesResource', () => {
 
       await expect(resource.list('v1', 'doc.md')).rejects.toBeInstanceOf(NetworkError);
     });
+
+    it('wraps a bare object response in an array via ensureArray', async () => {
+      const bareLink = {
+        id: 'sl1', documentId: 'd1', vaultId: 'v1', createdBy: 'u1',
+        tokenPrefix: 'abc12345', permission: 'view', expiresAt: null,
+        maxViews: null, viewCount: 0, isActive: true, createdAt: '2024-01-01',
+      };
+      mockJsonResponse(kyMock.get, { shareLinks: bareLink });
+
+      const result = await resource.list('v1', 'notes/meeting.md');
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result).toEqual([bareLink]);
+    });
   });
 
   describe('create', () => {

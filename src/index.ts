@@ -125,6 +125,8 @@ export { PluginsResource } from './resources/plugins.js';
 export type { InstalledPlugin, InstallPluginInput } from './resources/plugins.js';
 export { CollaborationResource } from './resources/collaboration.js';
 
+export { ensureArray } from './utils/ensure-array.js';
+
 // Request signing
 export {
   signRequest,

@@ -1,5 +1,6 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import { ensureArray } from '../utils/ensure-array.js';
 
 /** A share link for a document. */
 export interface ShareLink {
@@ -90,7 +91,7 @@ export class SharesResource {
       const data = await this.http
         .get(`vaults/${vaultId}/shares/document/${documentPath}`)
         .json<{ shareLinks: ShareLink[] }>();
-      return data.shareLinks;
+      return ensureArray(data.shareLinks);
     } catch (error) {
       throw await handleError(error, 'Share Links', documentPath);
     }
