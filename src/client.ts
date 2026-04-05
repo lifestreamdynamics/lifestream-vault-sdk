@@ -1,4 +1,4 @@
-import ky, { type KyInstance } from 'ky';
+import ky, { type KyInstance, type BeforeRequestHook, type AfterResponseHook, type BeforeErrorHook } from 'ky';
 import { VaultsResource } from './resources/vaults.js';
 import { DocumentsResource } from './resources/documents.js';
 import { SearchResource } from './resources/search.js';
@@ -238,13 +238,13 @@ export class LifestreamVaultClient {
       delay: options.retry.delay,
     } : undefined;
 
-    const beforeRequestHooks: Array<(request: Request) => void | Promise<void>> = [];
-    const afterResponseHooks: Array<(request: Request, options: unknown, response: Response) => Response | void | Promise<Response | void>> = [];
+    const beforeRequestHooks: BeforeRequestHook[] = [];
+    const afterResponseHooks: AfterResponseHook[] = [];
 
     // Request signing hook -- adds HMAC signature headers to mutating requests
     if (shouldSign && options.apiKey) {
       const apiKeyForSigning = options.apiKey;
-      beforeRequestHooks.push(async (request: Request) => {
+      beforeRequestHooks.push(async (request) => {
         const url = new URL(request.url);
         const method = request.method.toUpperCase();
 
@@ -273,12 +273,12 @@ export class LifestreamVaultClient {
       const auditLogger = new AuditLogger({ logPath: options.auditLogPath });
       const requestTimings = new WeakMap<Request, number>();
 
-      beforeRequestHooks.push((request: Request) => {
+      beforeRequestHooks.push((request) => {
         requestTimings.set(request, Date.now());
       });
 
       afterResponseHooks.push(
-        async (request: Request, _options: unknown, response: Response) => {
+        async (request, _options, response) => {
           const startTime = requestTimings.get(request);
           const durationMs = startTime ? Date.now() - startTime : 0;
           const url = new URL(request.url);
@@ -302,14 +302,13 @@ export class LifestreamVaultClient {
     const eventTimings = emitter ? new WeakMap<Request, number>() : null;
 
     if (emitter && eventTimings) {
-      beforeRequestHooks.push((request: Request) => {
+      beforeRequestHooks.push((request) => {
         eventTimings.set(request, Date.now());
         const url = new URL(request.url);
         emitter.emit('beforeRequest', { url: url.href, method: request.method });
       });
 
-      afterResponseHooks.push((_request: Request, _options: unknown, response: Response) => {
-        const request = _request;
+      afterResponseHooks.push((request, _options, response) => {
         const startTime = eventTimings.get(request);
         const durationMs = startTime !== undefined ? Date.now() - startTime : 0;
         const url = new URL(request.url);
@@ -325,22 +324,23 @@ export class LifestreamVaultClient {
     // Append user-supplied hooks (run last so they see the final request state)
     if (options.beforeRequest) {
       for (const hook of options.beforeRequest) {
-        beforeRequestHooks.push(hook);
+        // Wrap user hook to match ky's hook signature
+        beforeRequestHooks.push((request) => hook(request));
       }
     }
     if (options.afterResponse) {
       for (const hook of options.afterResponse) {
-        // Wrap user hook to match ky's 3-arg signature
-        afterResponseHooks.push((request: Request, _options: unknown, response: Response) =>
+        // Wrap user hook to match ky's 4-arg signature
+        afterResponseHooks.push((request, _options, response) =>
           hook(request, response),
         );
       }
     }
 
     // Build beforeError hooks for error event emission
-    const beforeErrorHooks: Array<(error: Error & { request?: Request }) => Error> = [];
+    const beforeErrorHooks: BeforeErrorHook[] = [];
     if (emitter) {
-      beforeErrorHooks.push((error: Error & { request?: Request }) => {
+      beforeErrorHooks.push((error) => {
         const req = error.request;
         const url = req ? new URL(req.url).href : 'unknown';
         const method = req ? req.method : 'unknown';
@@ -389,7 +389,7 @@ export class LifestreamVaultClient {
       let configuredHttp: KyInstance;
 
       // JWT beforeRequest: proactive refresh + set Authorization header
-      beforeRequestHooks.push(async (request: Request) => {
+      beforeRequestHooks.push(async (request) => {
         if (tokenManager.needsRefresh() && tokenManager.getRefreshToken()) {
           try {
             await tokenManager.refresh(baseHttp);
@@ -401,7 +401,7 @@ export class LifestreamVaultClient {
       });
 
       // JWT afterResponse: reactive 401 retry
-      afterResponseHooks.push(async (request: Request, _options: unknown, response: Response) => {
+      afterResponseHooks.push(async (request, _options, response) => {
         if (
           response.status === 401
           && !request.headers.get(RETRY_HEADER)
