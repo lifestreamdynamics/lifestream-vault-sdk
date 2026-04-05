@@ -1,6 +1,6 @@
 {
   "name": "@lifestreamdynamics/vault-sdk",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "description": "Official TypeScript SDK for Lifestream Vault API",
   "engines": {
     "node": ">=22"
