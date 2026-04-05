@@ -92,7 +92,7 @@ export class AnalyticsResource {
    */
   async getPublishedDocAnalytics(vaultId: string, publishedDocId: string): Promise<PublishedDocAnalytics> {
     try {
-      return await this.http.get(`vaults/${vaultId}/publish/document/${publishedDocId}/analytics`).json<PublishedDocAnalytics>();
+      return await this.http.get(`analytics/vaults/${vaultId}/published/${publishedDocId}`).json<PublishedDocAnalytics>();
     } catch (error) {
       throw await handleError(error, 'Analytics', publishedDocId);
     }

@@ -29,7 +29,7 @@ export interface TeamMember {
   /** ID of the member user. */
   userId: string;
   /** Role within the team. */
-  role: 'owner' | 'admin' | 'member';
+  role: 'owner' | 'admin' | 'editor' | 'viewer';
   /** ISO 8601 timestamp when the user joined the team. */
   joinedAt: string;
   /** Basic user information for the member. */
@@ -49,7 +49,7 @@ export interface TeamInvitation {
   /** Email address of the invited user. */
   email: string;
   /** Role the user will receive upon accepting. */
-  role: 'admin' | 'member';
+  role: 'admin' | 'editor' | 'viewer';
   /** User ID of the person who sent the invitation. */
   invitedBy: string;
   /** ISO 8601 creation timestamp. */
@@ -271,7 +271,7 @@ export class TeamsResource {
    * console.log(member.role); // 'admin'
    * ```
    */
-  async updateMemberRole(teamId: string, userId: string, role: 'admin' | 'member'): Promise<TeamMember> {
+  async updateMemberRole(teamId: string, userId: string, role: 'admin' | 'editor' | 'viewer'): Promise<TeamMember> {
     try {
       return await this.http.patch(`teams/${teamId}/members/${userId}`, { json: { role } }).json<TeamMember>();
     } catch (error) {
@@ -335,7 +335,7 @@ export class TeamsResource {
    *
    * @param teamId - The unique identifier of the team
    * @param email - Email address of the user to invite
-   * @param role - Role to assign upon acceptance (`'admin'` or `'member'`)
+   * @param role - Role to assign upon acceptance (`'admin'`, `'editor'`, or `'viewer'`)
    * @returns The created invitation object
    * @throws {ValidationError} If the email is invalid or the user is already a member
    * @throws {AuthorizationError} If the user lacks admin/owner role
@@ -347,12 +347,12 @@ export class TeamsResource {
    * const invitation = await client.teams.inviteMember(
    *   'team-uuid',
    *   'colleague@example.com',
-   *   'member',
+   *   'editor',
    * );
    * console.log(invitation.expiresAt);
    * ```
    */
-  async inviteMember(teamId: string, email: string, role: 'admin' | 'member'): Promise<TeamInvitation> {
+  async inviteMember(teamId: string, email: string, role: 'admin' | 'editor' | 'viewer'): Promise<TeamInvitation> {
     try {
       return await this.http.post(`teams/${teamId}/invitations`, { json: { email, role } }).json<TeamInvitation>();
     } catch (error) {

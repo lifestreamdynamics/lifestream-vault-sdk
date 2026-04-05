@@ -147,7 +147,7 @@ describe('TeamsResource', () => {
     it('should list team members', async () => {
       const mockMembers = [
         { id: 'm1', teamId: 't1', userId: 'u1', role: 'owner', joinedAt: '2024-01-01', user: { id: 'u1', email: 'owner@test.com', displayName: 'Owner' } },
-        { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'member@test.com', displayName: null } },
+        { id: 'm2', teamId: 't1', userId: 'u2', role: 'editor', joinedAt: '2024-01-02', user: { id: 'u2', email: 'member@test.com', displayName: null } },
       ];
       mockJsonResponse(kyMock.get, { members: mockMembers });
 
@@ -189,20 +189,20 @@ describe('TeamsResource', () => {
       expect(result).toEqual(mockMember);
     });
 
-    it('should update a member role to member', async () => {
-      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'member', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', displayName: 'User' } };
+    it('should update a member role to editor', async () => {
+      const mockMember = { id: 'm2', teamId: 't1', userId: 'u2', role: 'editor', joinedAt: '2024-01-02', user: { id: 'u2', email: 'user@test.com', displayName: 'User' } };
       mockJsonResponse(kyMock.patch, mockMember);
 
-      const result = await resource.updateMemberRole('t1', 'u2', 'member');
+      const result = await resource.updateMemberRole('t1', 'u2', 'editor');
 
-      expect(kyMock.patch).toHaveBeenCalledWith('teams/t1/members/u2', { json: { role: 'member' } });
-      expect(result.role).toBe('member');
+      expect(kyMock.patch).toHaveBeenCalledWith('teams/t1/members/u2', { json: { role: 'editor' } });
+      expect(result.role).toBe('editor');
     });
 
     it('should throw AuthorizationError on 403', async () => {
       mockHTTPError(kyMock.patch, 403, { message: 'Cannot change owner role' });
 
-      await expect(resource.updateMemberRole('t1', 'u1', 'member')).rejects.toBeInstanceOf(AuthorizationError);
+      await expect(resource.updateMemberRole('t1', 'u1', 'editor')).rejects.toBeInstanceOf(AuthorizationError);
     });
   });
 
@@ -253,19 +253,19 @@ describe('TeamsResource', () => {
       expect(result).toEqual(mockInvitation);
     });
 
-    it('should invite a member with member role', async () => {
-      const mockInvitation = { id: 'inv2', teamId: 't1', email: 'colleague@test.com', role: 'member', invitedBy: 'u1', createdAt: '2024-01-01', expiresAt: '2024-01-08' };
+    it('should invite a member with editor role', async () => {
+      const mockInvitation = { id: 'inv2', teamId: 't1', email: 'colleague@test.com', role: 'editor', invitedBy: 'u1', createdAt: '2024-01-01', expiresAt: '2024-01-08' };
       mockJsonResponse(kyMock.post, mockInvitation);
 
-      const result = await resource.inviteMember('t1', 'colleague@test.com', 'member');
+      const result = await resource.inviteMember('t1', 'colleague@test.com', 'editor');
 
-      expect(result.role).toBe('member');
+      expect(result.role).toBe('editor');
     });
 
     it('should throw ValidationError when user is already a member', async () => {
       mockHTTPError(kyMock.post, 400, { message: 'User is already a member' });
 
-      await expect(resource.inviteMember('t1', 'existing@test.com', 'member')).rejects.toBeInstanceOf(ValidationError);
+      await expect(resource.inviteMember('t1', 'existing@test.com', 'editor')).rejects.toBeInstanceOf(ValidationError);
     });
 
     it('should throw AuthorizationError on 403', async () => {
@@ -278,7 +278,7 @@ describe('TeamsResource', () => {
   describe('listInvitations', () => {
     it('should list pending invitations', async () => {
       const mockInvitations = [
-        { id: 'inv1', teamId: 't1', email: 'pending@test.com', role: 'member', invitedBy: 'u1', createdAt: '2024-01-01', expiresAt: '2024-01-08' },
+        { id: 'inv1', teamId: 't1', email: 'pending@test.com', role: 'editor', invitedBy: 'u1', createdAt: '2024-01-01', expiresAt: '2024-01-08' },
       ];
       mockJsonResponse(kyMock.get, { invitations: mockInvitations });
 

@@ -118,7 +118,7 @@ describe('AnalyticsResource', () => {
 
       const result = await resource.getPublishedDocAnalytics('v1', 'p1');
 
-      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/publish/document/p1/analytics');
+      expect(kyMock.get).toHaveBeenCalledWith('analytics/vaults/v1/published/p1');
       expect(result.publishedDocId).toBe('p1');
       expect(result.viewCount).toBe(200);
       expect(result.uniqueViewers).toBe(150);
