@@ -191,6 +191,113 @@ describe('LifestreamVaultClient', () => {
     expect(client.mfa.setupTotp).toBeInstanceOf(Function);
     expect(client.mfa.verifyTotp).toBeInstanceOf(Function);
   });
+
+  it('should accept retry config without error', () => {
+    expect(() => {
+      new LifestreamVaultClient({
+        baseUrl: 'http://localhost:4660',
+        apiKey: 'lsv_k_testkey',
+        retry: { limit: 3, statusCodes: [500, 502, 503] },
+      });
+    }).not.toThrow();
+  });
+
+  it('should pass retry config to ky.create()', async () => {
+    const ky = await import('ky');
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      retry: { limit: 0 },
+    });
+
+    expect(ky.default.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        retry: expect.objectContaining({ limit: 0 }),
+      }),
+    );
+  });
+
+  it('should not pass retry to ky.create() when retry option is absent', async () => {
+    const ky = await import('ky');
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    expect(call.retry).toBeUndefined();
+  });
+
+  it('should store the events emitter on the client', async () => {
+    const { SDKEventEmitter } = await import('./lib/event-emitter.js');
+    const emitter = new SDKEventEmitter();
+
+    const client = new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      events: emitter,
+    });
+
+    expect(client.events).toBe(emitter);
+  });
+
+  it('should leave events undefined when not provided', () => {
+    const client = new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+    });
+
+    expect(client.events).toBeUndefined();
+  });
+
+  it('should append custom beforeRequest hook to ky hooks', async () => {
+    const ky = await import('ky');
+    const customHook = vi.fn();
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      beforeRequest: [customHook],
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    expect(call.hooks.beforeRequest).toContain(customHook);
+  });
+
+  it('should append custom afterResponse hook to ky hooks (wrapped)', async () => {
+    const ky = await import('ky');
+    const customHook = vi.fn();
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      afterResponse: [customHook],
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    // There should be at least one afterResponse hook (the wrapper)
+    expect(call.hooks.afterResponse.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should add event hooks when events option is provided', async () => {
+    const ky = await import('ky');
+    const { SDKEventEmitter } = await import('./lib/event-emitter.js');
+    const emitter = new SDKEventEmitter();
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      events: emitter,
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    // Signing hook + event beforeRequest hook = 2
+    expect(call.hooks.beforeRequest.length).toBeGreaterThanOrEqual(2);
+    // Event afterResponse hook = 1
+    expect(call.hooks.afterResponse.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 describe('LifestreamVaultClient.login', () => {

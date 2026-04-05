@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AiResource } from './ai.js';
-import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, type KyMock } from '../__tests__/mocks/ky.js';
+import type { AiStreamResult } from './ai.js';
+import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, mockStreamResponse, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError, NotFoundError, AuthenticationError, RateLimitError } from '../errors.js';
 
 describe('AiResource', () => {
@@ -235,6 +236,154 @@ describe('AiResource', () => {
       mockNetworkError(kyMock.post);
 
       await expect(resource.suggest({ vaultId: 'v1', documentPath: 'doc.md', type: 'grammar' })).rejects.toBeInstanceOf(NetworkError);
+    });
+  });
+
+  describe('chatStream', () => {
+    /** Helper: build a ReadableStream that emits SSE lines. */
+    function buildSseStream(lines: string[]): ReadableStream<Uint8Array> {
+      const encoder = new TextEncoder();
+      return new ReadableStream({
+        start(controller) {
+          for (const line of lines) {
+            controller.enqueue(encoder.encode(line));
+          }
+          controller.close();
+        },
+      });
+    }
+
+    /** Helper: drain an async generator and return chunks + final result. */
+    async function drainStream(
+      gen: AsyncGenerator<{ content: string }, AiStreamResult>,
+    ): Promise<{ chunks: string[]; result: AiStreamResult }> {
+      const chunks: string[] = [];
+      let result: AiStreamResult | undefined;
+      while (true) {
+        const { value, done } = await gen.next();
+        if (done) {
+          result = value;
+          break;
+        }
+        chunks.push(value.content);
+      }
+      return { chunks, result: result! };
+    }
+
+    it('yields content chunks from SSE stream', async () => {
+      const stream = buildSseStream([
+        'data: {"content":"Hello "}\n\n',
+        'data: {"content":"world!"}\n\n',
+        'data: {"done":true,"sessionId":"s1"}\n\n',
+      ]);
+
+      mockStreamResponse(
+        kyMock.post,
+        new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'X-Session-Id': 's1',
+            'X-Sources': '["doc.md"]',
+          },
+        }),
+      );
+
+      const gen = resource.chatStream({ message: 'Hi' });
+      const { chunks, result } = await drainStream(gen);
+
+      expect(chunks).toEqual(['Hello ', 'world!']);
+      expect(result.sessionId).toBe('s1');
+      expect(result.sources).toEqual(['doc.md']);
+    });
+
+    it('handles empty sources header', async () => {
+      const stream = buildSseStream([
+        'data: {"content":"Hi"}\n\n',
+        'data: {"done":true,"sessionId":"s2"}\n\n',
+      ]);
+
+      mockStreamResponse(
+        kyMock.post,
+        new Response(stream, {
+          headers: { 'Content-Type': 'text/event-stream', 'X-Session-Id': 's2' },
+        }),
+      );
+
+      const { chunks, result } = await drainStream(resource.chatStream({ message: 'Hello' }));
+
+      expect(chunks).toEqual(['Hi']);
+      expect(result.sources).toEqual([]);
+      expect(result.sessionId).toBe('s2');
+    });
+
+    it('uses sessionId from done event over response header', async () => {
+      const stream = buildSseStream([
+        'data: {"content":"chunk"}\n\n',
+        'data: {"done":true,"sessionId":"session-from-event"}\n\n',
+      ]);
+
+      mockStreamResponse(
+        kyMock.post,
+        new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'X-Session-Id': 'session-from-header',
+          },
+        }),
+      );
+
+      const { result } = await drainStream(resource.chatStream({ message: 'Test' }));
+      expect(result.sessionId).toBe('session-from-event');
+    });
+
+    it('falls back to header sessionId when done event has none', async () => {
+      const stream = buildSseStream([
+        'data: {"content":"chunk"}\n\n',
+        'data: {"done":true}\n\n',
+      ]);
+
+      mockStreamResponse(
+        kyMock.post,
+        new Response(stream, {
+          headers: { 'Content-Type': 'text/event-stream', 'X-Session-Id': 'header-session' },
+        }),
+      );
+
+      const { result } = await drainStream(resource.chatStream({ message: 'Test' }));
+      expect(result.sessionId).toBe('header-session');
+    });
+
+    it('passes sessionId and vaultId in request body', async () => {
+      const stream = buildSseStream(['data: {"done":true,"sessionId":"s3"}\n\n']);
+
+      mockStreamResponse(
+        kyMock.post,
+        new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } }),
+      );
+
+      await drainStream(resource.chatStream({ message: 'Continue', sessionId: 's3', vaultId: 'v1' }));
+
+      expect(kyMock.post).toHaveBeenCalledWith('ai/chat', {
+        json: { message: 'Continue', sessionId: 's3', vaultId: 'v1' },
+        signal: undefined,
+        headers: { 'Accept': 'text/event-stream' },
+      });
+    });
+
+    it('throws on network error', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(
+        drainStream(resource.chatStream({ message: 'Hi' })),
+      ).rejects.toBeInstanceOf(NetworkError);
+    });
+
+    it('throws AuthenticationError on 401', async () => {
+      mockHTTPError(kyMock.post, 401, { message: 'Unauthorized' });
+
+      await expect(
+        drainStream(resource.chatStream({ message: 'Hi' })),
+      ).rejects.toBeInstanceOf(AuthenticationError);
     });
   });
 });

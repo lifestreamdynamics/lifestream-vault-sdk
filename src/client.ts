@@ -28,6 +28,7 @@ import { ValidationError } from './errors.js';
 import { AuditLogger } from './lib/audit-logger.js';
 import { signRequest } from './lib/signature.js';
 import { TokenManager, type AuthTokens, type OnTokenRefresh } from './lib/token-manager.js';
+import { SDKEventEmitter } from './lib/event-emitter.js';
 import type { MfaMethod, MfaChallengeResponse, AuthResponse } from './types/api.js';
 import { isMfaChallenge } from './types/api.js';
 
@@ -73,6 +74,25 @@ export interface ClientOptions {
   auditLogPath?: string;
   /** SCIM Bearer token. When provided, enables the `scim` resource for user provisioning. */
   scimToken?: string;
+  /** Custom beforeRequest hooks. Called before each outgoing request. */
+  beforeRequest?: Array<(request: Request) => void | Promise<void>>;
+  /** Custom afterResponse hooks. Called after each response is received. */
+  afterResponse?: Array<(request: Request, response: Response) => void | Promise<void>>;
+  /** Event emitter for SDK lifecycle events (beforeRequest, afterResponse, error, tokenRefresh). */
+  events?: SDKEventEmitter;
+  /** Retry configuration for failed requests. Passed through to ky's retry option. */
+  retry?: {
+    /** Maximum number of retries. Default: 2 (ky default). Set to 0 to disable. */
+    limit?: number;
+    /** HTTP status codes that trigger a retry. Default: [408, 413, 429, 500, 502, 503, 504]. */
+    statusCodes?: number[];
+    /** HTTP methods eligible for retry. Default: ['get', 'put', 'head', 'delete', 'options', 'trace']. */
+    methods?: string[];
+    /** Maximum backoff time in milliseconds. */
+    backoffLimit?: number;
+    /** Custom delay function. Receives attempt count (starting at 1), returns ms to wait. */
+    delay?: (attemptCount: number) => number;
+  };
 }
 
 /**
@@ -174,6 +194,8 @@ export class LifestreamVaultClient {
   readonly collaboration: CollaborationResource;
   /** Token manager for JWT auto-refresh (null when using API key auth). */
   readonly tokenManager: TokenManager | null;
+  /** Event emitter for SDK lifecycle events. Undefined if not provided in options. */
+  readonly events?: SDKEventEmitter;
 
   /**
    * Creates a new Lifestream Vault API client.
@@ -199,12 +221,22 @@ export class LifestreamVaultClient {
     }
 
     this.baseUrl = (options.baseUrl || DEFAULT_API_URL).replace(/\/$/, '');
+    this.events = options.events;
 
     const prefixUrl = `${this.baseUrl}/api/v1`;
     const timeout = options.timeout || 30_000;
 
     // Determine whether to enable request signing
     const shouldSign = options.enableRequestSigning ?? !!options.apiKey;
+
+    // Build retry config if provided
+    const retryConfig = options.retry ? {
+      limit: options.retry.limit ?? 2,
+      statusCodes: options.retry.statusCodes,
+      methods: options.retry.methods,
+      backoffLimit: options.retry.backoffLimit,
+      delay: options.retry.delay,
+    } : undefined;
 
     const beforeRequestHooks: Array<(request: Request) => void | Promise<void>> = [];
     const afterResponseHooks: Array<(request: Request, options: unknown, response: Response) => Response | void | Promise<Response | void>> = [];
@@ -265,6 +297,58 @@ export class LifestreamVaultClient {
       );
     }
 
+    // Event emitter hooks (timing-aware; run after audit logging to capture accurate durations)
+    const emitter = options.events;
+    const eventTimings = emitter ? new WeakMap<Request, number>() : null;
+
+    if (emitter && eventTimings) {
+      beforeRequestHooks.push((request: Request) => {
+        eventTimings.set(request, Date.now());
+        const url = new URL(request.url);
+        emitter.emit('beforeRequest', { url: url.href, method: request.method });
+      });
+
+      afterResponseHooks.push((_request: Request, _options: unknown, response: Response) => {
+        const request = _request;
+        const startTime = eventTimings.get(request);
+        const durationMs = startTime !== undefined ? Date.now() - startTime : 0;
+        const url = new URL(request.url);
+        emitter.emit('afterResponse', {
+          url: url.href,
+          method: request.method,
+          status: response.status,
+          durationMs,
+        });
+      });
+    }
+
+    // Append user-supplied hooks (run last so they see the final request state)
+    if (options.beforeRequest) {
+      for (const hook of options.beforeRequest) {
+        beforeRequestHooks.push(hook);
+      }
+    }
+    if (options.afterResponse) {
+      for (const hook of options.afterResponse) {
+        // Wrap user hook to match ky's 3-arg signature
+        afterResponseHooks.push((request: Request, _options: unknown, response: Response) =>
+          hook(request, response),
+        );
+      }
+    }
+
+    // Build beforeError hooks for error event emission
+    const beforeErrorHooks: Array<(error: Error & { request?: Request }) => Error> = [];
+    if (emitter) {
+      beforeErrorHooks.push((error: Error & { request?: Request }) => {
+        const req = error.request;
+        const url = req ? new URL(req.url).href : 'unknown';
+        const method = req ? req.method : 'unknown';
+        emitter.emit('error', { url, method, error });
+        return error;
+      });
+    }
+
     if (options.apiKey) {
       // API key auth: static Authorization header, no token management
       this.tokenManager = null;
@@ -278,7 +362,9 @@ export class LifestreamVaultClient {
         hooks: {
           beforeRequest: beforeRequestHooks,
           afterResponse: afterResponseHooks,
+          ...(beforeErrorHooks.length > 0 ? { beforeError: beforeErrorHooks } : {}),
         },
+        ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
       });
     } else {
       // JWT auth: set up token manager with optional auto-refresh
@@ -328,10 +414,14 @@ export class LifestreamVaultClient {
             });
             retryRequest.headers.set('Authorization', `Bearer ${newToken}`);
             retryRequest.headers.set(RETRY_HEADER, '1');
+            // Emit successful token refresh event
+            emitter?.emit('tokenRefresh', { success: true });
             // Use the configured ky instance so signing, audit-logging, and
             // timeout settings are all applied to the retry request.
             return configuredHttp(retryRequest);
           } catch {
+            // Emit failed token refresh event
+            emitter?.emit('tokenRefresh', { success: false });
             // Refresh failed; return original 401
             return response;
           }
@@ -345,7 +435,9 @@ export class LifestreamVaultClient {
         hooks: {
           beforeRequest: beforeRequestHooks,
           afterResponse: afterResponseHooks,
+          ...(beforeErrorHooks.length > 0 ? { beforeError: beforeErrorHooks } : {}),
         },
+        ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
       });
 
       // Assign the late-binding reference now that this.http is fully constructed.
@@ -380,6 +472,8 @@ export class LifestreamVaultClient {
         prefixUrl: `${this.baseUrl}/api/v1/scim/v2`,
         timeout,
         headers: { 'Authorization': `Bearer ${options.scimToken}` },
+        ...(beforeErrorHooks.length > 0 ? { hooks: { beforeError: beforeErrorHooks } } : {}),
+        ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
       });
       this.scim = new ScimResource(scimHttp);
     } else {

@@ -112,4 +112,22 @@ export function mockNetworkError(method: ReturnType<typeof vi.fn>, error?: Error
   });
 }
 
+/**
+ * Helper to make a ky mock method resolve directly to a Response object.
+ * Used for streaming responses where the caller awaits the method directly
+ * (without calling .json() or .text()), e.g. for SSE / chatStream.
+ */
+export function mockStreamResponse(method: ReturnType<typeof vi.fn>, response: Response) {
+  // The ky method must resolve to the Response when awaited directly.
+  // We model this as a thenable with .json()/.text() stubs for completeness.
+  const resolved = Promise.resolve(response);
+  method.mockReturnValue(Object.assign(resolved, {
+    json: vi.fn().mockRejectedValue(new Error('Use direct await for streaming')),
+    text: vi.fn().mockRejectedValue(new Error('Use direct await for streaming')),
+    blob: vi.fn().mockRejectedValue(new Error('Use direct await for streaming')),
+    ok: true,
+    status: 200,
+  }));
+}
+
 export type KyMock = ReturnType<typeof createKyMock>;

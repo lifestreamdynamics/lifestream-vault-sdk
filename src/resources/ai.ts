@@ -29,6 +29,17 @@ export interface AiChatMessage {
   createdAt: string;
 }
 
+/** A single content chunk from a streaming AI chat response. */
+export interface AiStreamChunk {
+  content: string;
+}
+
+/** The final result returned when the AI chat stream completes. */
+export interface AiStreamResult {
+  sessionId: string;
+  sources: string[];
+}
+
 /** A document similar to a reference document, found via vector similarity. */
 export interface SimilarDocument {
   /** Document unique identifier. */
@@ -108,6 +119,75 @@ export class AiResource {
       return await this.http.post('ai/chat', { json: body, signal }).json<{ sessionId: string; message: { role: string; content: string; sources: string[] }; tokensUsed: number }>();
     } catch (error) {
       throw await handleError(error, 'AI Chat', params.sessionId ?? '');
+    }
+  }
+
+  /**
+   * Sends a message to the AI chat and receives a streaming response.
+   * Yields content chunks as they arrive via Server-Sent Events.
+   *
+   * @example
+   * ```typescript
+   * const stream = client.ai.chatStream({ message: 'Summarize my notes' });
+   * let fullContent = '';
+   * for await (const chunk of stream) {
+   *   process.stdout.write(chunk.content);
+   *   fullContent += chunk.content;
+   * }
+   * // The return value is available after iteration completes
+   * ```
+   */
+  async *chatStream(params: {
+    message: string;
+    sessionId?: string;
+    vaultId?: string;
+    signal?: AbortSignal;
+  }): AsyncGenerator<AiStreamChunk, AiStreamResult> {
+    const { signal, ...body } = params;
+    try {
+      const response: Response = await this.http.post('ai/chat', {
+        json: body,
+        signal,
+        headers: { 'Accept': 'text/event-stream' },
+      });
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let sessionId = response.headers.get('X-Session-Id') ?? '';
+      const sourcesHeader = response.headers.get('X-Sources');
+      const sources: string[] = sourcesHeader ? JSON.parse(sourcesHeader) : [];
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const data = JSON.parse(line.slice(6));
+
+            if (data.done) {
+              sessionId = data.sessionId ?? sessionId;
+              return { sessionId, sources };
+            }
+
+            if (data.content) {
+              yield { content: data.content };
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      return { sessionId, sources };
+    } catch (error) {
+      throw await handleError(error, 'AI Chat Stream', params.sessionId ?? '');
     }
   }
 

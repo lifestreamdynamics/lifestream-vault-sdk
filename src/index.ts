@@ -5,7 +5,7 @@ export { DocumentsResource } from './resources/documents.js';
 export type { BulkOperationResult, DocumentVersion, DocumentVersionWithContent, VersionDiffResponse, ForwardLinkResult, BacklinkResult } from './resources/documents.js';
 export { SearchResource } from './resources/search.js';
 export { AiResource } from './resources/ai.js';
-export type { SimilarDocument } from './resources/ai.js';
+export type { SimilarDocument, AiStreamChunk, AiStreamResult } from './resources/ai.js';
 export { ApiKeysResource } from './resources/api-keys.js';
 export type { ApiKey, ApiKeyWithSecret, CreateApiKeyParams, UpdateApiKeyParams } from './resources/api-keys.js';
 export { UserResource } from './resources/user.js';
@@ -141,6 +141,10 @@ export {
 
 // Audit logging
 export { AuditLogger, type AuditEntry, type AuditLoggerOptions } from './lib/audit-logger.js';
+
+// Event emitter
+export { SDKEventEmitter } from './lib/event-emitter.js';
+export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent } from './lib/event-emitter.js';
 
 // Encryption
 export {
