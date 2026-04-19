@@ -192,6 +192,36 @@ export class AiResource {
   }
 
   /**
+   * Creates a new empty AI chat session without sending a message.
+   *
+   * Useful for pre-creating named sessions before starting a conversation.
+   * If no title is provided, the session will have a null title until a
+   * message is sent via {@link AiResource.chat}.
+   *
+   * @param params - Optional session parameters
+   * @param params.title - Optional title for the session (max 200 characters)
+   * @param params.vaultId - Optional vault ID to scope the session to a specific vault
+   * @returns The newly created session object
+   * @throws {AuthenticationError} If the request is not authenticated
+   * @throws {AuthorizationError} If the user's subscription does not include AI features, or the vault does not belong to the user
+   * @throws {NetworkError} If the request fails due to network issues
+   *
+   * @example
+   * ```typescript
+   * const session = await client.ai.createSession({ title: 'Q1 Planning Notes' });
+   * console.log(session.id); // Use this ID with client.ai.chat()
+   * ```
+   */
+  async createSession(params: { title?: string; vaultId?: string } = {}): Promise<AiChatSession> {
+    try {
+      const data = await this.http.post('ai/sessions', { json: params }).json<{ session: AiChatSession }>();
+      return data.session;
+    } catch (error) {
+      throw await handleError(error, 'AI Session', '');
+    }
+  }
+
+  /**
    * Lists all AI chat sessions for the authenticated user.
    *
    * @returns Array of chat session objects, ordered by most recent first
