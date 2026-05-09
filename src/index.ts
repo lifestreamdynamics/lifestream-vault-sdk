@@ -139,8 +139,10 @@ export {
   MAX_TIMESTAMP_AGE_MS,
 } from './lib/signature.js';
 
-// Audit logging
-export { AuditLogger, type AuditEntry, type AuditLoggerOptions } from './lib/audit-logger.js';
+// Audit logging — types only in the main barrel. The AuditLogger class lives at
+// `@lifestreamdynamics/vault-sdk/audit` because it imports node:fs/path/os and
+// would break React Native / browser bundlers if dragged into the main entry.
+export type { AuditEntry, AuditLoggerOptions } from './lib/audit-logger.js';
 
 // Event emitter
 export { SDKEventEmitter } from './lib/event-emitter.js';

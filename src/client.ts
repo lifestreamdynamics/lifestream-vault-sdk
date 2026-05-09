@@ -25,7 +25,10 @@ import { ScimResource } from './resources/scim.js';
 import { PluginsResource } from './resources/plugins.js';
 import { CollaborationResource } from './resources/collaboration.js';
 import { ValidationError } from './errors.js';
-import { AuditLogger } from './lib/audit-logger.js';
+// Audit logging lives at `@lifestreamdynamics/vault-sdk/audit` — Node-only
+// because it touches `node:fs`/`node:path`/`node:os`. The main client must
+// never reference it (Metro/RN bundlers cannot tree-shake `await import()`,
+// so even a lazy import would drag node:* into the bundle).
 import { signRequest } from './lib/signature.js';
 import { TokenManager, type AuthTokens, type OnTokenRefresh } from './lib/token-manager.js';
 import { SDKEventEmitter } from './lib/event-emitter.js';
@@ -68,10 +71,6 @@ export interface ClientOptions {
   onTokenRefresh?: OnTokenRefresh;
   /** Enable HMAC-SHA256 request signing for sensitive operations. Defaults to true when using API keys, false for JWT. */
   enableRequestSigning?: boolean;
-  /** Enable client-side audit logging of requests. Defaults to false. */
-  enableAuditLogging?: boolean;
-  /** Path to the audit log file. Defaults to `~/.lsvault/audit.log`. */
-  auditLogPath?: string;
   /** SCIM Bearer token. When provided, enables the `scim` resource for user provisioning. */
   scimToken?: string;
   /** Custom beforeRequest hooks. Called before each outgoing request. */
@@ -268,34 +267,8 @@ export class LifestreamVaultClient {
       });
     }
 
-    // Audit logging hooks
-    if (options.enableAuditLogging) {
-      const auditLogger = new AuditLogger({ logPath: options.auditLogPath });
-      const requestTimings = new WeakMap<Request, number>();
-
-      beforeRequestHooks.push((request) => {
-        requestTimings.set(request, Date.now());
-      });
-
-      afterResponseHooks.push(
-        async (request, _options, response) => {
-          const startTime = requestTimings.get(request);
-          const durationMs = startTime ? Date.now() - startTime : 0;
-          const url = new URL(request.url);
-          try {
-            await auditLogger.log({
-              timestamp: new Date().toISOString(),
-              method: request.method,
-              path: url.pathname,
-              status: response.status,
-              durationMs,
-            });
-          } catch {
-            // Audit logging is best-effort; never break requests
-          }
-        },
-      );
-    }
+    // Audit logging is opt-in via `installAuditLogging(client, ...)` from
+    // `@lifestreamdynamics/vault-sdk/audit` (Node-only consumers).
 
     // Event emitter hooks (timing-aware; run after audit logging to capture accurate durations)
     const emitter = options.events;
