@@ -20,6 +20,13 @@ export type {
   DocumentGetResult,
   DocumentFetched,
   DocumentNotModified,
+  DocumentListOptions,
+  DocumentListResult,
+  DocumentListFetched,
+  DocumentListNotModified,
+  SyncListKnownState,
+  SyncListChange,
+  SyncListResult,
   ForwardLinkResult,
   BacklinkResult,
 } from '../resources/documents.js';

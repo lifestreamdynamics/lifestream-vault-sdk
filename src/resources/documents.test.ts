@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DocumentsResource } from './documents.js';
+import type { SyncListKnownState } from './documents.js';
 import { createKyMock, mockJsonResponse, mockNetworkError, mockHTTPError, type KyMock } from '../__tests__/mocks/ky.js';
 import { NetworkError, NotFoundError } from '../errors.js';
 
@@ -39,6 +40,138 @@ describe('DocumentsResource', () => {
       const result = await resource.list('v1');
 
       expect(result).toEqual([]);
+    });
+
+    describe('conditional list (ifNoneMatch)', () => {
+      const remoteDocs = [
+        {
+          id: 'd1', path: 'notes/a.md', title: 'A', tags: [], sizeBytes: 100,
+          fileModifiedAt: '2024-01-01', contentHash: 'hash-a',
+        },
+        {
+          id: 'd2', path: 'notes/b.md', title: 'B', tags: [], sizeBytes: 200,
+          fileModifiedAt: '2024-01-02', contentHash: 'hash-b',
+        },
+      ];
+
+      it('unconditional form (no options) still returns array — back-compat', async () => {
+        mockJsonResponse(kyMock.get, { documents: remoteDocs });
+
+        const result = await resource.list('v1');
+
+        expect(Array.isArray(result)).toBe(true);
+        expect(result).toEqual(remoteDocs);
+        // Confirm the discriminated union fields are absent on the plain array path.
+        expect((result as unknown as { notModified?: boolean }).notModified).toBeUndefined();
+      });
+
+      it('returns { notModified: false, etag, documents } on 200 with conditional request', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ etag: 'W/"2-1704067200000-|nofm"' }),
+          json: () => Promise.resolve({ documents: remoteDocs }),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.list('v1', undefined, { ifNoneMatch: 'W/"old-etag"' });
+
+        expect(result).toEqual({
+          notModified: false,
+          etag: 'W/"2-1704067200000-|nofm"',
+          documents: remoteDocs,
+        });
+        expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', {
+          searchParams: {},
+          headers: { 'If-None-Match': 'W/"old-etag"' },
+          throwHttpErrors: false,
+        });
+      });
+
+      it('returns { notModified: true, etag } on 304', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 304,
+          headers: new Headers({ etag: 'W/"2-1704067200000-|nofm"' }),
+          json: () => { throw new Error('json should not be called on 304'); },
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.list('v1', undefined, { ifNoneMatch: 'W/"2-1704067200000-|nofm"' });
+
+        expect(result).toEqual({ notModified: true, etag: 'W/"2-1704067200000-|nofm"' });
+      });
+
+      it('falls back to caller-supplied ifNoneMatch as etag when 304 has no etag header', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 304,
+          headers: new Headers(),
+          json: () => { throw new Error('json should not be called'); },
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.list('v1', undefined, { ifNoneMatch: 'W/"stored-etag"' });
+
+        expect(result).toEqual({ notModified: true, etag: 'W/"stored-etag"' });
+      });
+
+      it('treats empty string ifNoneMatch as conditional (bootstrap call)', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ etag: 'W/"1-abc"' }),
+          json: () => Promise.resolve({ documents: remoteDocs }),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.list('v1', undefined, { ifNoneMatch: '' });
+
+        // Empty-string ifNoneMatch still takes the conditional path.
+        expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', expect.objectContaining({
+          headers: { 'If-None-Match': '' },
+          throwHttpErrors: false,
+        }));
+        expect(result).toEqual({ notModified: false, etag: 'W/"1-abc"', documents: remoteDocs });
+      });
+
+      it('handles old server (200 with no etag header) gracefully', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers(), // no etag header — old server
+          json: () => Promise.resolve({ documents: remoteDocs }),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.list('v1', undefined, { ifNoneMatch: 'W/"anything"' });
+
+        // Must NOT throw. etag field is empty string; notModified is false.
+        expect(result).toEqual({ notModified: false, etag: '', documents: remoteDocs });
+      });
+
+      it('throws NotFoundError on 404 even with throwHttpErrors disabled', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 404,
+          headers: new Headers(),
+          json: () => Promise.resolve({ message: 'Vault not found' }),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        await expect(
+          resource.list('v1', undefined, { ifNoneMatch: 'W/"x"' }),
+        ).rejects.toBeInstanceOf(NotFoundError);
+      });
+
+      it('passes limit, offset, and tags as searchParams in conditional form', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ etag: 'W/"1"' }),
+          json: () => Promise.resolve({ documents: [] }),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        await resource.list('v1', 'notes/', { limit: 10, offset: 20, tags: ['foo', 'bar'], ifNoneMatch: '' });
+
+        expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', expect.objectContaining({
+          searchParams: { dir: 'notes/', limit: 10, offset: 20, tags: 'foo,bar' },
+        }));
+      });
     });
   });
 
@@ -588,6 +721,156 @@ describe('DocumentsResource', () => {
       const result = await resource.deleteMany('v1', ['old/a.md', 'old/missing.md']);
 
       expect(result.failed[0].path).toBe('old/missing.md');
+    });
+  });
+
+  describe('syncList', () => {
+    /** Helper: build a standard raw response mock for the conditional GET path. */
+    function mockListResponse(
+      status: number,
+      etag: string | null,
+      documents: unknown[],
+    ) {
+      const headers = new Headers();
+      if (etag !== null) headers.set('etag', etag);
+      kyMock.get.mockReturnValueOnce({
+        ok: status >= 200 && status < 300,
+        status,
+        headers,
+        json: () => (status === 304
+          ? Promise.reject(new Error('json should not be called on 304'))
+          : Promise.resolve({ documents })),
+      } as unknown as ReturnType<typeof kyMock.get>);
+    }
+
+    const doc = (path: string, hash: string, mtime = '2024-01-01') => ({
+      id: path, path, title: null, tags: [], sizeBytes: 100, fileModifiedAt: mtime, contentHash: hash,
+    });
+
+    it('classifies all docs as added when knownState is empty', async () => {
+      const docs = [doc('a.md', 'h-a'), doc('b.md', 'h-b'), doc('c.md', 'h-c')];
+      mockListResponse(200, 'W/"3-t"', docs);
+
+      const result = await resource.syncList('v1', { hashes: {} });
+
+      expect(result.vaultUnchanged).toBe(false);
+      expect(result.changes).toHaveLength(3);
+      expect(result.changes.every((c) => c.kind === 'added')).toBe(true);
+      expect(result.changes.map((c) => c.path).sort()).toEqual(['a.md', 'b.md', 'c.md']);
+      expect(result.removed).toEqual([]);
+      expect(result.unchanged).toEqual([]);
+      expect(result.listEtag).toBe('W/"3-t"');
+    });
+
+    it('classifies all docs as unchanged when all hashes match', async () => {
+      const docs = [doc('a.md', 'h-a'), doc('b.md', 'h-b')];
+      mockListResponse(200, 'W/"2-t"', docs);
+
+      const knownState: SyncListKnownState = {
+        hashes: { 'a.md': 'h-a', 'b.md': 'h-b' },
+        listEtag: 'W/"old"',
+      };
+
+      const result = await resource.syncList('v1', knownState);
+
+      expect(result.vaultUnchanged).toBe(false);
+      expect(result.changes).toHaveLength(0);
+      expect(result.unchanged.sort()).toEqual(['a.md', 'b.md']);
+      expect(result.removed).toEqual([]);
+    });
+
+    it('reports exactly one changed entry when one hash differs', async () => {
+      const docs = [doc('a.md', 'h-a-NEW'), doc('b.md', 'h-b')];
+      mockListResponse(200, 'W/"2-t"', docs);
+
+      const knownState: SyncListKnownState = {
+        hashes: { 'a.md': 'h-a-OLD', 'b.md': 'h-b' },
+      };
+
+      const result = await resource.syncList('v1', knownState);
+
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0]).toEqual({
+        path: 'a.md',
+        contentHash: 'h-a-NEW',
+        fileModifiedAt: '2024-01-01',
+        kind: 'changed',
+      });
+      expect(result.unchanged).toEqual(['b.md']);
+      expect(result.removed).toEqual([]);
+    });
+
+    it('reports removed paths that are in knownState but absent from server', async () => {
+      const docs = [doc('a.md', 'h-a')];
+      mockListResponse(200, 'W/"1-t"', docs);
+
+      const knownState: SyncListKnownState = {
+        hashes: { 'a.md': 'h-a', 'b.md': 'h-b', 'c.md': 'h-c' },
+      };
+
+      const result = await resource.syncList('v1', knownState);
+
+      expect(result.removed.sort()).toEqual(['b.md', 'c.md']);
+      expect(result.unchanged).toEqual(['a.md']);
+      expect(result.changes).toHaveLength(0);
+    });
+
+    it('returns vaultUnchanged=true when server 304s (listEtag matched)', async () => {
+      mockListResponse(304, 'W/"2-t"', []);
+
+      const knownState: SyncListKnownState = {
+        hashes: { 'a.md': 'h-a', 'b.md': 'h-b' },
+        listEtag: 'W/"2-t"',
+      };
+
+      const result = await resource.syncList('v1', knownState);
+
+      expect(result.vaultUnchanged).toBe(true);
+      expect(result.changes).toEqual([]);
+      expect(result.removed).toEqual([]);
+      expect(result.unchanged.sort()).toEqual(['a.md', 'b.md']);
+      expect(result.listEtag).toBe('W/"2-t"');
+    });
+
+    it('passes empty string ifNoneMatch on first call (no listEtag in knownState)', async () => {
+      const docs = [doc('a.md', 'h-a')];
+      mockListResponse(200, 'W/"1-t"', docs);
+
+      await resource.syncList('v1', { hashes: {} });
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', expect.objectContaining({
+        headers: { 'If-None-Match': '' },
+        throwHttpErrors: false,
+      }));
+    });
+
+    it('old-server scenario: 200 with no etag header — vaultUnchanged=false, classification works', async () => {
+      const docs = [doc('a.md', 'h-a'), doc('b.md', 'h-b-NEW')];
+      mockListResponse(200, null /* no etag header */, docs);
+
+      const knownState: SyncListKnownState = {
+        hashes: { 'a.md': 'h-a', 'b.md': 'h-b-OLD' },
+        listEtag: 'W/"anything"',
+      };
+
+      const result = await resource.syncList('v1', knownState);
+
+      expect(result.vaultUnchanged).toBe(false);
+      expect(result.listEtag).toBe(''); // etag is empty because old server returned no header
+      expect(result.changes).toHaveLength(1);
+      expect(result.changes[0].path).toBe('b.md');
+      expect(result.changes[0].kind).toBe('changed');
+      expect(result.unchanged).toEqual(['a.md']);
+    });
+
+    it('forwards dirPath and tags options to the list call', async () => {
+      mockListResponse(200, 'W/"0-t"', []);
+
+      await resource.syncList('v1', { hashes: {} }, { dirPath: 'notes/', tags: ['foo'] });
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', expect.objectContaining({
+        searchParams: expect.objectContaining({ dir: 'notes/', tags: 'foo' }),
+      }));
     });
   });
 });

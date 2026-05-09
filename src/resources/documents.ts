@@ -59,6 +59,100 @@ export interface DocumentGetOptions {
 }
 
 /**
+ * Options for {@link DocumentsResource.list}.
+ * When `ifNoneMatch` is provided the request becomes conditional and the return
+ * type changes to `DocumentListResult` (the discriminated union).
+ */
+export interface DocumentListOptions {
+  /** Maximum number of documents to return. */
+  limit?: number;
+  /** Number of documents to skip (for pagination). */
+  offset?: number;
+  /** Filter to documents that carry all of the specified tags. */
+  tags?: string[];
+  /**
+   * Conditional LIST. Supply the `etag` returned by a previous conditional
+   * list call. When the server answers 304 Not Modified the SDK returns
+   * `{ notModified: true }` without a document body. Pass an empty string
+   * (`''`) for the first call — the server will treat it as a non-match,
+   * return 200 with a real ETag, and the result bootstraps subsequent calls.
+   */
+  ifNoneMatch?: string;
+}
+
+/**
+ * Result of a conditional {@link DocumentsResource.list} when the server
+ * answered 304 Not Modified. The caller's cached document list is still current.
+ */
+export interface DocumentListNotModified {
+  notModified: true;
+  /** The ETag that was sent — confirmed still current by the server. */
+  etag: string;
+}
+
+/**
+ * Result of {@link DocumentsResource.list} when the document list was
+ * returned. The `etag` is suitable for re-use as `ifNoneMatch` on the next
+ * call.
+ */
+export interface DocumentListFetched {
+  notModified: false;
+  /** Weak ETag for the returned list (RFC 7232). Empty string if the server
+   * does not support list ETags (old server). */
+  etag: string;
+  /** The documents in the list. */
+  documents: DocumentListItem[];
+}
+
+/** Discriminated union returned by conditional list calls. */
+export type DocumentListResult = DocumentListFetched | DocumentListNotModified;
+
+/**
+ * The caller's known state of a vault, used by {@link DocumentsResource.syncList}
+ * to detect changes without fetching every document body.
+ */
+export interface SyncListKnownState {
+  /** Map of document path → SHA-256 hex hash the client already has. */
+  hashes: Record<string, string>;
+  /** ETag from a previous {@link DocumentsResource.syncList} call, if any. */
+  listEtag?: string;
+}
+
+/** A single document that has been added or changed on the server. */
+export interface SyncListChange {
+  /** File path relative to vault root. */
+  path: string;
+  /** SHA-256 hex digest of the current server-side content. */
+  contentHash: string;
+  /** ISO 8601 timestamp of the last file modification on the server. */
+  fileModifiedAt: string;
+  /** Whether this document is new to the client (`'added'`) or has a
+   * different hash from the client's cached version (`'changed'`). */
+  kind: 'added' | 'changed';
+}
+
+/** Result of {@link DocumentsResource.syncList}. */
+export interface SyncListResult {
+  /** Documents that are new or have changed since the client's last known state. */
+  changes: SyncListChange[];
+  /** Paths that were in the client's known state but are no longer on the server. */
+  removed: string[];
+  /** Paths whose content hash matches the client's known state exactly. */
+  unchanged: string[];
+  /** The list ETag from this response, to be stored and passed back on the
+   * next call as `knownState.listEtag`. Empty string if the server does not
+   * support list ETags. */
+  listEtag: string;
+  /**
+   * `true` when the server 304'd the list request, meaning the vault is
+   * completely unchanged since the last call. When `true`, all other fields
+   * are trivially derived from `knownState` (changes and removed are empty,
+   * unchanged contains every known path).
+   */
+  vaultUnchanged: boolean;
+}
+
+/**
  * Result of a conditional {@link DocumentsResource.get} when the server
  * answered 304 Not Modified. The caller's cached copy is still current.
  */
@@ -177,38 +271,189 @@ export class DocumentsResource {
   /**
    * Lists documents in a vault, optionally filtered by directory.
    *
+   * **Unconditional form** — returns an array directly (backward-compatible):
+   * ```typescript
+   * const docs = await client.documents.list('vault-uuid');
+   * const notes = await client.documents.list('vault-uuid', 'notes/');
+   * ```
+   *
+   * **Conditional form** — supply `ifNoneMatch` to get a discriminated-union
+   * result that lets you skip processing when the vault is unchanged:
+   * ```typescript
+   * // Bootstrap: pass empty string on first call.
+   * const result = await client.documents.list('vault-uuid', undefined, { ifNoneMatch: '' });
+   * if (!result.notModified) {
+   *   // result.documents is available; store result.etag for the next call.
+   * }
+   * ```
+   *
    * @param vaultId - The vault ID to list documents from
    * @param dirPath - Optional directory path to filter results (e.g., `'notes/'`)
-   * @returns Array of document summary objects
+   * @param options - Optional query/conditional parameters
    * @throws {NotFoundError} If the vault does not exist
    * @throws {AuthenticationError} If the request is not authenticated
    * @throws {NetworkError} If the request fails due to network issues
-   *
-   * @example
-   * ```typescript
-   * // List all documents
-   * const docs = await client.documents.list('vault-uuid');
-   *
-   * // List documents in a subdirectory
-   * const notes = await client.documents.list('vault-uuid', 'notes/');
-   * ```
    */
+  async list(vaultId: string, dirPath?: string): Promise<DocumentListItem[]>;
+  async list(
+    vaultId: string,
+    dirPath: string | undefined,
+    options: Omit<DocumentListOptions, 'ifNoneMatch'> & { ifNoneMatch?: undefined },
+  ): Promise<DocumentListItem[]>;
+  async list(
+    vaultId: string,
+    dirPath: string | undefined,
+    options: DocumentListOptions & { ifNoneMatch: string },
+  ): Promise<DocumentListResult>;
   async list(
     vaultId: string,
     dirPath?: string,
-    options?: { limit?: number; offset?: number; tags?: string[] },
-  ): Promise<DocumentListItem[]> {
+    options?: DocumentListOptions,
+  ): Promise<DocumentListItem[] | DocumentListResult> {
+    const searchParams: Record<string, string | number> = {};
+    if (dirPath) searchParams.dir = dirPath;
+    if (options?.limit !== undefined) searchParams.limit = options.limit;
+    if (options?.offset !== undefined) searchParams.offset = options.offset;
+    if (options?.tags && options.tags.length > 0) searchParams.tags = options.tags.join(',');
+
+    // Unconditional path — backward-compatible, returns array directly.
+    if (options?.ifNoneMatch === undefined) {
+      try {
+        const data = await this.http
+          .get(`vaults/${vaultId}/documents`, { searchParams })
+          .json<{ documents: DocumentListItem[] }>();
+        return data.documents;
+      } catch (error) {
+        throw await handleError(error, 'Documents', vaultId);
+      }
+    }
+
+    // Conditional path. Disable ky's default throw-on-non-2xx so we can
+    // inspect a 304 response — ky treats 3xx as errors by default.
     try {
-      const searchParams: Record<string, string | number> = {};
-      if (dirPath) searchParams.dir = dirPath;
-      if (options?.limit !== undefined) searchParams.limit = options.limit;
-      if (options?.offset !== undefined) searchParams.offset = options.offset;
-      if (options?.tags && options.tags.length > 0) searchParams.tags = options.tags.join(',');
-      const data = await this.http.get(`vaults/${vaultId}/documents`, { searchParams }).json<{ documents: DocumentListItem[] }>();
-      return data.documents;
+      const response = await this.http.get(`vaults/${vaultId}/documents`, {
+        searchParams,
+        headers: { 'If-None-Match': options.ifNoneMatch },
+        throwHttpErrors: false,
+      });
+      const etag = response.headers.get('etag') ?? '';
+      if (response.status === 304) {
+        return { notModified: true, etag: etag || options.ifNoneMatch };
+      }
+      if (!response.ok) {
+        const body = (await response.json().catch(() => ({}))) as { message?: string; details?: unknown };
+        const msg = body.message ?? `HTTP ${response.status}`;
+        if (response.status === 400) throw new ValidationError(msg, body.details);
+        if (response.status === 401) throw new AuthenticationError(msg);
+        if (response.status === 403) throw new AuthorizationError(msg);
+        if (response.status === 404) throw new NotFoundError('Vault', vaultId);
+        if (response.status === 409) throw new ConflictError(msg);
+        if (response.status === 429) throw new RateLimitError(msg);
+        throw new SDKError(msg, response.status);
+      }
+      const body = await response.json<{ documents: DocumentListItem[] }>();
+      return { notModified: false, etag, documents: body.documents };
     } catch (error) {
+      if (error instanceof SDKError) throw error;
       throw await handleError(error, 'Documents', vaultId);
     }
+  }
+
+  /**
+   * High-level helper for efficient vault sync. Calls the conditional LIST
+   * endpoint and classifies each document as added, changed, or unchanged
+   * relative to `knownState`. Removed documents (present in `knownState` but
+   * absent from the server response) are reported separately.
+   *
+   * In steady state (vault unchanged), this issues a single HTTP request that
+   * returns 304 — zero body bytes transferred and zero per-document GETs
+   * required.
+   *
+   * Old-server compatibility: when the server does not support list ETags it
+   * ignores `If-None-Match` and returns 200 with no `etag` header. The SDK
+   * handles this gracefully (`listEtag` will be an empty string; `vaultUnchanged`
+   * will be `false`). The next call will pass an empty `ifNoneMatch` again,
+   * which is safe — the server just always returns the full list.
+   *
+   * @param vaultId - The vault ID to sync
+   * @param knownState - The client's last-known document hashes and list ETag
+   * @param options - Optional directory and tag filters
+   *
+   * @example
+   * ```typescript
+   * let state: SyncListKnownState = { hashes: {} };
+   *
+   * // Every poll cycle:
+   * const result = await client.documents.syncList('vault-uuid', state);
+   * if (result.vaultUnchanged) {
+   *   console.log('Nothing to do');
+   * } else {
+   *   for (const change of result.changes) {
+   *     const doc = await client.documents.get('vault-uuid', change.path);
+   *     // … apply change locally …
+   *   }
+   *   for (const path of result.removed) {
+   *     // … delete locally …
+   *   }
+   *   // Persist the new state for the next poll.
+   *   state = {
+   *     hashes: Object.fromEntries(
+   *       [...result.changes, ...result.unchanged.map(p => ({
+   *         path: p,
+   *         contentHash: state.hashes[p],
+   *       }))].map(c => [c.path, c.contentHash ?? state.hashes[c.path]]),
+   *     ),
+   *     listEtag: result.listEtag,
+   *   };
+   * }
+   * ```
+   */
+  async syncList(
+    vaultId: string,
+    knownState: SyncListKnownState,
+    options?: { dirPath?: string; tags?: string[] },
+  ): Promise<SyncListResult> {
+    const result = await this.list(vaultId, options?.dirPath, {
+      tags: options?.tags,
+      ifNoneMatch: knownState.listEtag ?? '',
+    });
+
+    if (result.notModified) {
+      return {
+        changes: [],
+        removed: [],
+        unchanged: Object.keys(knownState.hashes),
+        listEtag: result.etag,
+        vaultUnchanged: true,
+      };
+    }
+
+    // result is DocumentListFetched
+    const remotePathSet = new Set(result.documents.map((d) => d.path));
+
+    const changes: SyncListChange[] = [];
+    const unchanged: string[] = [];
+
+    for (const doc of result.documents) {
+      const knownHash = knownState.hashes[doc.path];
+      if (knownHash === undefined) {
+        changes.push({ path: doc.path, contentHash: doc.contentHash, fileModifiedAt: doc.fileModifiedAt, kind: 'added' });
+      } else if (knownHash !== doc.contentHash) {
+        changes.push({ path: doc.path, contentHash: doc.contentHash, fileModifiedAt: doc.fileModifiedAt, kind: 'changed' });
+      } else {
+        unchanged.push(doc.path);
+      }
+    }
+
+    const removed = Object.keys(knownState.hashes).filter((p) => !remotePathSet.has(p));
+
+    return {
+      changes,
+      removed,
+      unchanged,
+      listEtag: result.etag,
+      vaultUnchanged: false,
+    };
   }
 
   /**
