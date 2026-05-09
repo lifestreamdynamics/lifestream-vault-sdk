@@ -45,6 +45,7 @@
   "homepage": "https://github.com/lifestreamdynamics/lifestream-vault-sdk#readme",
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
