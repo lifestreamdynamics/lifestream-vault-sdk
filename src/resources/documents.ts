@@ -1,5 +1,14 @@
 import type { KyInstance } from 'ky';
 import { handleError } from '../handle-error.js';
+import {
+  SDKError,
+  ValidationError,
+  AuthenticationError,
+  AuthorizationError,
+  NotFoundError,
+  ConflictError,
+  RateLimitError,
+} from '../errors.js';
 import { encrypt, decrypt } from '../lib/encryption.js';
 
 /** Metadata for a document stored in a vault. */
@@ -37,6 +46,41 @@ export interface DocumentWithContent {
   /** Raw Markdown content of the document. */
   content: string;
 }
+
+/** Options for {@link DocumentsResource.get}. */
+export interface DocumentGetOptions {
+  /**
+   * Conditional GET. If the document's current ETag matches this value the
+   * server returns 304 Not Modified and the SDK returns
+   * `{ notModified: true }` instead of the full body. Use the `etag` returned
+   * from a prior {@link DocumentsResource.get} call.
+   */
+  ifNoneMatch?: string;
+}
+
+/**
+ * Result of a conditional {@link DocumentsResource.get} when the server
+ * answered 304 Not Modified. The caller's cached copy is still current.
+ */
+export interface DocumentNotModified {
+  notModified: true;
+  /** The ETag that was sent — confirmed still current by the server. */
+  etag: string;
+}
+
+/**
+ * Result of {@link DocumentsResource.get} when the document body was
+ * returned. The `etag` is suitable for re-use as `ifNoneMatch` on the next
+ * call.
+ */
+export interface DocumentFetched extends DocumentWithContent {
+  notModified: false;
+  /** Strong ETag for the returned content (RFC 7232, quote-wrapped). */
+  etag: string;
+}
+
+/** Discriminated union returned by conditional gets. */
+export type DocumentGetResult = DocumentFetched | DocumentNotModified;
 
 /** Version metadata for a document. */
 export interface DocumentVersion {
@@ -100,6 +144,11 @@ export interface DocumentListItem {
   sizeBytes: number;
   /** ISO 8601 timestamp of the last file modification. */
   fileModifiedAt: string;
+  /**
+   * SHA-256 hex digest of the document body. Lets sync clients short-circuit
+   * unchanged docs without a per-doc GET round trip.
+   */
+  contentHash: string;
 }
 
 /** Result of a bulk operation on multiple documents. */
@@ -181,10 +230,52 @@ export class DocumentsResource {
    * console.log(document.title, content);
    * ```
    */
-  async get(vaultId: string, docPath: string): Promise<DocumentWithContent> {
+  async get(vaultId: string, docPath: string): Promise<DocumentWithContent>;
+  async get(vaultId: string, docPath: string, options: DocumentGetOptions): Promise<DocumentGetResult>;
+  async get(
+    vaultId: string,
+    docPath: string,
+    options?: DocumentGetOptions,
+  ): Promise<DocumentWithContent | DocumentGetResult> {
+    if (options?.ifNoneMatch === undefined) {
+      try {
+        return await this.http.get(`vaults/${vaultId}/documents/${docPath}`).json<DocumentWithContent>();
+      } catch (error) {
+        throw await handleError(error, 'Document', docPath);
+      }
+    }
+
+    // Conditional GET path. Disable ky's default throw-on-non-2xx for this
+    // call so we can inspect a 304 response — ky treats 3xx as errors by
+    // default. We branch on status manually for 304 / 200 / error.
     try {
-      return await this.http.get(`vaults/${vaultId}/documents/${docPath}`).json<DocumentWithContent>();
+      const response = await this.http.get(`vaults/${vaultId}/documents/${docPath}`, {
+        headers: { 'If-None-Match': options.ifNoneMatch },
+        throwHttpErrors: false,
+      });
+      const etag = response.headers.get('etag') ?? '';
+      if (response.status === 304) {
+        return { notModified: true, etag: etag || options.ifNoneMatch };
+      }
+      if (!response.ok) {
+        // 4xx/5xx: throw the typed SDK error directly, mirroring handleError's
+        // status-to-error mapping. We can't synthesise a real ky HTTPError
+        // (its constructor demands a Request we don't have), so we map here.
+        const body = (await response.json().catch(() => ({}))) as { message?: string; details?: unknown };
+        const msg = body.message ?? `HTTP ${response.status}`;
+        if (response.status === 400) throw new ValidationError(msg, body.details);
+        if (response.status === 401) throw new AuthenticationError(msg);
+        if (response.status === 403) throw new AuthorizationError(msg);
+        if (response.status === 404) throw new NotFoundError('Document', docPath);
+        if (response.status === 409) throw new ConflictError(msg);
+        if (response.status === 429) throw new RateLimitError(msg);
+        throw new SDKError(msg, response.status);
+      }
+      const body = await response.json<DocumentWithContent>();
+      return { notModified: false, etag, ...body };
     } catch (error) {
+      // If we already threw a typed SDK error above, surface it as-is.
+      if (error instanceof SDKError) throw error;
       throw await handleError(error, 'Document', docPath);
     }
   }

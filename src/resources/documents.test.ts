@@ -72,6 +72,90 @@ describe('DocumentsResource', () => {
 
       await expect(resource.get('v1', 'nonexistent.md')).rejects.toBeInstanceOf(NotFoundError);
     });
+
+    describe('conditional GET (ifNoneMatch)', () => {
+      const docData = {
+        document: {
+          id: 'd1', vaultId: 'v1', path: 'hello.md', title: 'Hello', contentHash: 'abc',
+          sizeBytes: 50, tags: [], fileModifiedAt: '2024-01-01', createdAt: '2024-01-01', updatedAt: '2024-01-01',
+        },
+        content: '# Hello\n\nWorld',
+      };
+
+      it('returns notModified=true on 304', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 304,
+          headers: new Headers({ etag: '"abc"' }),
+          json: () => { throw new Error('json should not be called on 304'); },
+          text: () => Promise.resolve(''),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.get('v1', 'hello.md', { ifNoneMatch: '"abc"' });
+
+        expect(result).toEqual({ notModified: true, etag: '"abc"' });
+        expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents/hello.md', {
+          headers: { 'If-None-Match': '"abc"' },
+          throwHttpErrors: false,
+        });
+      });
+
+      it('returns notModified=false with body and etag on 200', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: true,
+          status: 200,
+          headers: new Headers({ etag: '"def"' }),
+          json: () => Promise.resolve(docData),
+          text: () => Promise.resolve(JSON.stringify(docData)),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.get('v1', 'hello.md', { ifNoneMatch: '"abc"' });
+
+        expect(result).toEqual({
+          notModified: false,
+          etag: '"def"',
+          ...docData,
+        });
+      });
+
+      it('falls back to caller-supplied etag if server omits the header on 304', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 304,
+          headers: new Headers(),
+          json: () => { throw new Error('json should not be called'); },
+          text: () => Promise.resolve(''),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        const result = await resource.get('v1', 'hello.md', { ifNoneMatch: '"abc"' });
+
+        expect(result).toEqual({ notModified: true, etag: '"abc"' });
+      });
+
+      it('preserves the original (no-options) overload signature', async () => {
+        // The unconditional form must still return DocumentWithContent directly,
+        // not the discriminated union — protect existing callers.
+        mockJsonResponse(kyMock.get, docData);
+        const result = await resource.get('v1', 'hello.md');
+        // result.notModified should NOT exist on the unconditional return type
+        expect(result).toEqual(docData);
+        expect((result as unknown as { notModified?: boolean }).notModified).toBeUndefined();
+      });
+
+      it('throws NotFoundError on 404 even with throwHttpErrors disabled', async () => {
+        kyMock.get.mockReturnValueOnce({
+          ok: false,
+          status: 404,
+          headers: new Headers(),
+          json: () => Promise.resolve({ message: 'Document not found' }),
+          text: () => Promise.resolve('{"message":"Document not found"}'),
+        } as unknown as ReturnType<typeof kyMock.get>);
+
+        await expect(
+          resource.get('v1', 'gone.md', { ifNoneMatch: '"abc"' }),
+        ).rejects.toBeInstanceOf(NotFoundError);
+      });
+    });
   });
 
   describe('put', () => {

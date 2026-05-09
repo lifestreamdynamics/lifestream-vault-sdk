@@ -16,6 +16,10 @@ export type {
   Document,
   DocumentWithContent,
   DocumentListItem,
+  DocumentGetOptions,
+  DocumentGetResult,
+  DocumentFetched,
+  DocumentNotModified,
   ForwardLinkResult,
   BacklinkResult,
 } from '../resources/documents.js';
