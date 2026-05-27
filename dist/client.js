@@ -1,4 +1,5 @@
 import ky from 'ky';
+import { RETRYABLE_STATUS_CODES } from '@lifestreamdynamics/vault-shared';
 import { VaultsResource } from './resources/vaults.js';
 import { DocumentsResource } from './resources/documents.js';
 import { SearchResource } from './resources/search.js';
@@ -175,14 +176,21 @@ export class LifestreamVaultClient {
         const timeout = options.timeout || 30_000;
         // Determine whether to enable request signing
         const shouldSign = options.enableRequestSigning ?? !!options.apiKey;
-        // Build retry config if provided
-        const retryConfig = options.retry ? {
-            limit: options.retry.limit ?? 2,
-            statusCodes: options.retry.statusCodes,
-            methods: options.retry.methods,
-            backoffLimit: options.retry.backoffLimit,
-            delay: options.retry.delay,
-        } : undefined;
+        // Build retry config — always-on with sensible defaults.
+        // Callers can override any field; pass `{ limit: 0 }` to disable.
+        // afterStatusCodes tells ky which status codes should use the Retry-After
+        // header to schedule the next attempt — 429 (rate-limit) and 503
+        // (service unavailable) are the canonical ones.
+        const retryConfig = {
+            limit: options.retry?.limit ?? 3,
+            statusCodes: options.retry?.statusCodes ?? [...RETRYABLE_STATUS_CODES],
+            methods: options.retry?.methods,
+            backoffLimit: options.retry?.backoffLimit ?? 30_000,
+            delay: options.retry?.delay,
+            // Honor Retry-After on 429 and 503 (ky's default afterStatusCodes already
+            // includes these, but we list them explicitly so intent is clear).
+            afterStatusCodes: [429, 503],
+        };
         const beforeRequestHooks = [];
         const afterResponseHooks = [];
         // Request signing hook -- adds HMAC signature headers to mutating requests
@@ -255,6 +263,25 @@ export class LifestreamVaultClient {
                 return error;
             });
         }
+        // Build beforeRetry hooks for retry observability.
+        // Fires once per retry attempt, AFTER ky has decided to retry and BEFORE
+        // the next request is sent (including any Retry-After wait).
+        const beforeRetryHooks = [];
+        if (emitter) {
+            beforeRetryHooks.push(({ request, error, retryCount }) => {
+                const url = new URL(request.url);
+                // error.response is present when the retry was triggered by a non-2xx
+                // HTTP response (e.g. 429); it is absent for network-level errors.
+                const status = error.response?.status;
+                emitter.emit('retry', {
+                    url: url.href,
+                    method: request.method,
+                    retryCount,
+                    status,
+                    error,
+                });
+            });
+        }
         if (options.apiKey) {
             // API key auth: static Authorization header, no token management
             this.tokenManager = null;
@@ -268,8 +295,9 @@ export class LifestreamVaultClient {
                     beforeRequest: beforeRequestHooks,
                     afterResponse: afterResponseHooks,
                     ...(beforeErrorHooks.length > 0 ? { beforeError: beforeErrorHooks } : {}),
+                    ...(beforeRetryHooks.length > 0 ? { beforeRetry: beforeRetryHooks } : {}),
                 },
-                ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
+                retry: retryConfig,
             });
         }
         else {
@@ -333,8 +361,9 @@ export class LifestreamVaultClient {
                     beforeRequest: beforeRequestHooks,
                     afterResponse: afterResponseHooks,
                     ...(beforeErrorHooks.length > 0 ? { beforeError: beforeErrorHooks } : {}),
+                    ...(beforeRetryHooks.length > 0 ? { beforeRetry: beforeRetryHooks } : {}),
                 },
-                ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
+                retry: retryConfig,
             });
             // Assign the late-binding reference now that this.http is fully constructed.
             configuredHttp = this.http;
@@ -366,8 +395,11 @@ export class LifestreamVaultClient {
                 prefixUrl: `${this.baseUrl}/api/v1/scim/v2`,
                 timeout,
                 headers: { 'Authorization': `Bearer ${options.scimToken}` },
-                ...(beforeErrorHooks.length > 0 ? { hooks: { beforeError: beforeErrorHooks } } : {}),
-                ...(retryConfig !== undefined ? { retry: retryConfig } : {}),
+                hooks: {
+                    ...(beforeErrorHooks.length > 0 ? { beforeError: beforeErrorHooks } : {}),
+                    ...(beforeRetryHooks.length > 0 ? { beforeRetry: beforeRetryHooks } : {}),
+                },
+                retry: retryConfig,
             });
             this.scim = new ScimResource(scimHttp);
         }

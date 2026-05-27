@@ -57,15 +57,37 @@ export interface ClientOptions {
     afterResponse?: Array<(request: Request, response: Response) => void | Promise<void>>;
     /** Event emitter for SDK lifecycle events (beforeRequest, afterResponse, error, tokenRefresh). */
     events?: SDKEventEmitter;
-    /** Retry configuration for failed requests. Passed through to ky's retry option. */
+    /**
+     * Retry configuration for failed requests.
+     *
+     * **Retry is ON by default.** When this option is omitted the SDK applies a
+     * sensible default config: up to 3 retries on status codes
+     * `[408, 429, 500, 502, 503, 504]` with exponential back-off capped at
+     * 30 000 ms.  For 429 and 503 responses ky automatically waits the duration
+     * specified in the server's `Retry-After` header before retrying (up to the
+     * `backoffLimit`), so throttled requests are retried transparently without
+     * the caller ever seeing an error.
+     *
+     * Pass `{ limit: 0 }` to disable retry entirely.
+     *
+     * **Methods:** by default only `GET`, `PUT`, `HEAD`, `DELETE`, `OPTIONS`,
+     * and `TRACE` are retried (ky's default safe-method set).  `POST` and
+     * `PATCH` are intentionally excluded because they are not guaranteed
+     * idempotent — document-mutating `POST` requests that partially succeeded
+     * could be duplicated on retry.
+     */
     retry?: {
-        /** Maximum number of retries. Default: 2 (ky default). Set to 0 to disable. */
+        /** Maximum number of retries. Default: 3. Set to 0 to disable. */
         limit?: number;
-        /** HTTP status codes that trigger a retry. Default: [408, 413, 429, 500, 502, 503, 504]. */
+        /** HTTP status codes that trigger a retry. Default: [408, 429, 500, 502, 503, 504]. */
         statusCodes?: number[];
-        /** HTTP methods eligible for retry. Default: ['get', 'put', 'head', 'delete', 'options', 'trace']. */
+        /**
+         * HTTP methods eligible for retry.
+         * Default: `['get', 'put', 'head', 'delete', 'options', 'trace']` (ky default safe-method set).
+         * POST and PATCH are excluded because they are not guaranteed idempotent.
+         */
         methods?: string[];
-        /** Maximum backoff time in milliseconds. */
+        /** Maximum backoff time in milliseconds. Default: 30000. */
         backoffLimit?: number;
         /** Custom delay function. Receives attempt count (starting at 1), returns ms to wait. */
         delay?: (attemptCount: number) => number;

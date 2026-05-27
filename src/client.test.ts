@@ -202,7 +202,7 @@ describe('LifestreamVaultClient', () => {
     }).not.toThrow();
   });
 
-  it('should pass retry config to ky.create()', async () => {
+  it('should pass retry config to ky.create() and caller limit:0 disables retry', async () => {
     const ky = await import('ky');
 
     new LifestreamVaultClient({
@@ -218,7 +218,21 @@ describe('LifestreamVaultClient', () => {
     );
   });
 
-  it('should not pass retry to ky.create() when retry option is absent', async () => {
+  it('should merge caller retry options over defaults', async () => {
+    const ky = await import('ky');
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+      retry: { limit: 5, backoffLimit: 60_000 },
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    expect(call.retry.limit).toBe(5);
+    expect(call.retry.backoffLimit).toBe(60_000);
+  });
+
+  it('should always pass retry to ky.create() with default config when option is absent', async () => {
     const ky = await import('ky');
 
     new LifestreamVaultClient({
@@ -227,7 +241,24 @@ describe('LifestreamVaultClient', () => {
     });
 
     const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
-    expect(call.retry).toBeUndefined();
+    // Retry is now always-on; defaults applied
+    expect(call.retry).toBeDefined();
+    expect(call.retry.limit).toBe(3);
+    expect(call.retry.backoffLimit).toBe(30_000);
+    // afterStatusCodes should include 429 for Retry-After header support
+    expect(call.retry.afterStatusCodes).toContain(429);
+  });
+
+  it('should include 429 in default retry statusCodes', async () => {
+    const ky = await import('ky');
+
+    new LifestreamVaultClient({
+      baseUrl: 'http://localhost:4660',
+      apiKey: 'lsv_k_testkey',
+    });
+
+    const call = vi.mocked(ky.default.create).mock.calls[0][0] as any;
+    expect(call.retry.statusCodes).toContain(429);
   });
 
   it('should store the events emitter on the client', async () => {

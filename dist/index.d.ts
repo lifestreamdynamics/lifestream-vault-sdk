@@ -51,7 +51,7 @@ export { ensureArray } from './utils/ensure-array.js';
 export { signRequest, buildSignaturePayload, signPayload, generateNonce, SIGNATURE_HEADER, SIGNATURE_TIMESTAMP_HEADER, SIGNATURE_NONCE_HEADER, MAX_TIMESTAMP_AGE_MS, } from './lib/signature.js';
 export type { AuditEntry, AuditLoggerOptions } from './lib/audit-logger.js';
 export { SDKEventEmitter } from './lib/event-emitter.js';
-export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent } from './lib/event-emitter.js';
+export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent, RetryEvent } from './lib/event-emitter.js';
 export { generateVaultKey, encrypt as encryptContent, decrypt as decryptContent, isEncryptedEnvelope, type EncryptedEnvelope, } from './lib/encryption.js';
 export { TokenManager, decodeJwtPayload, isTokenExpired, type AuthTokens, type JwtPayload, type OnTokenRefresh, type TokenManagerOptions, } from './lib/token-manager.js';
 export { SDKError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, RateLimitError, NetworkError, } from './errors.js';

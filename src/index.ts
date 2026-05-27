@@ -146,7 +146,7 @@ export type { AuditEntry, AuditLoggerOptions } from './lib/audit-logger.js';
 
 // Event emitter
 export { SDKEventEmitter } from './lib/event-emitter.js';
-export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent } from './lib/event-emitter.js';
+export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent, RetryEvent } from './lib/event-emitter.js';
 
 // Encryption
 export {

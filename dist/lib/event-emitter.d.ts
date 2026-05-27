@@ -17,11 +17,33 @@ export interface RequestErrorEvent {
 export interface TokenRefreshEvent {
     success: boolean;
 }
+/**
+ * Emitted when ky is about to retry a request after a retryable failure.
+ * Fired from the `beforeRetry` ky hook, so it fires before the retry attempt
+ * is sent, not after the failed attempt is received.
+ */
+export interface RetryEvent {
+    /** Request URL. */
+    url: string;
+    /** HTTP method (upper-cased). */
+    method: string;
+    /** 1-based retry attempt number (1 = first retry). */
+    retryCount: number;
+    /**
+     * HTTP status code of the response that triggered the retry, if any.
+     * Undefined for network-level errors (no response received).
+     */
+    status: number | undefined;
+    /** The error that triggered the retry. */
+    error: Error;
+}
 export type SDKEventMap = {
     beforeRequest: BeforeRequestEvent;
     afterResponse: AfterResponseEvent;
     error: RequestErrorEvent;
     tokenRefresh: TokenRefreshEvent;
+    /** Fired before each retry attempt. Subscribe to observe back-off/throttle handling. */
+    retry: RetryEvent;
 };
 /**
  * Lightweight typed event emitter for SDK lifecycle events.
