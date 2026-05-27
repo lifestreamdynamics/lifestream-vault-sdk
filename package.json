@@ -45,7 +45,7 @@
   "homepage": "https://github.com/lifestreamdynamics/lifestream-vault-sdk#readme",
   "scripts": {
     "build": "tsc",
-    "prepare": "tsc",
+    "prepare": "node -e \"process.exit(require('fs').existsSync('tsconfig.json')?0:1)\" && tsc || echo \"sdk: skip prepare (no tsconfig — using prebuilt dist)\"",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
