@@ -1,0 +1,6 @@
+export type { PaginatedResponse, ApiErrorResponse, MessageResponse, } from './api.js';
+export type { Vault, LinkGraphNode, LinkGraphEdge, LinkGraphResponse, UnresolvedLinkReference, UnresolvedLink, } from '../resources/vaults.js';
+export type { Document, DocumentWithContent, DocumentListItem, DocumentGetOptions, DocumentGetResult, DocumentFetched, DocumentNotModified, DocumentListOptions, DocumentListResult, DocumentListFetched, DocumentListNotModified, SyncListKnownState, SyncListChange, SyncListResult, ForwardLinkResult, BacklinkResult, } from '../resources/documents.js';
+export type { SearchResult, SearchResponse } from '../resources/search.js';
+export type { AiChatSession, AiChatMessage, SimilarDocument } from '../resources/ai.js';
+//# sourceMappingURL=index.d.ts.map

@@ -19,92 +19,21 @@ export type { ShareLink, CreateShareLinkParams, CreateShareLinkResponse } from '
 export { PublishResource } from './resources/publish.js';
 export type { PublishedDocument, PublishedDocumentWithMeta, PublishDocumentParams, UpdatePublishParams, PublishSubdomain } from './resources/publish.js';
 export { ConnectorsResource } from './resources/connectors.js';
-export type {
-  Connector,
-  ConnectorSyncLog,
-  CreateConnectorParams,
-  UpdateConnectorParams,
-  TestConnectionResult,
-  TriggerSyncResult,
-  ConnectorProvider,
-  SyncDirection,
-  ConnectorStatus,
-} from './resources/connectors.js';
+export type { Connector, ConnectorSyncLog, CreateConnectorParams, UpdateConnectorParams, TestConnectionResult, TriggerSyncResult, ConnectorProvider, SyncDirection, ConnectorStatus, } from './resources/connectors.js';
 export { HooksResource } from './resources/hooks.js';
 export type { Hook, HookExecution, CreateHookParams, UpdateHookParams } from './resources/hooks.js';
 export { WebhooksResource } from './resources/webhooks.js';
 export type { Webhook, WebhookWithSecret, WebhookDelivery, CreateWebhookParams, UpdateWebhookParams } from './resources/webhooks.js';
 export { AdminResource } from './resources/admin.js';
-export type {
-  SystemStats,
-  TimeseriesDataPoint,
-  TimeseriesResponse,
-  AdminUser,
-  AdminUserListResponse,
-  AdminUserDetail,
-  AdminUserListParams,
-  AdminUpdateUserParams,
-  ActivityEntry,
-  SubscriptionSummary,
-  SystemHealth,
-  BackupStatus,
-} from './resources/admin.js';
+export type { SystemStats, TimeseriesDataPoint, TimeseriesResponse, AdminUser, AdminUserListResponse, AdminUserDetail, AdminUserListParams, AdminUpdateUserParams, ActivityEntry, SubscriptionSummary, SystemHealth, BackupStatus, } from './resources/admin.js';
 export { MfaResource } from './resources/mfa.js';
 export type { MfaStatus, TotpSetupResponse, PasskeyInfo } from './types/api.js';
 export { CalendarResource } from './resources/calendar.js';
-export type {
-  CalendarEvent,
-  DueDocument,
-  CalendarDayData,
-  CalendarActivityDay,
-  CalendarResponse,
-  CalendarActivityResponse,
-  CreateCalendarEventInput,
-  AgendaGroup,
-  AgendaResponse,
-  TimelineItem,
-  TimelineResponse,
-  UpcomingResponse,
-  ICalTokenResponse,
-  ICalTokenStatus,
-  CalendarConnector,
-  CalendarConnectorSyncResult,
-  EventParticipant,
-  RecurrenceRule,
-  CalendarEventTemplate,
-  CreateEventTemplateInput,
-  UpdateEventTemplateInput,
-  CalendarConnectorOAuthResult,
-} from './resources/calendar.js';
+export type { CalendarEvent, DueDocument, CalendarDayData, CalendarActivityDay, CalendarResponse, CalendarActivityResponse, CreateCalendarEventInput, AgendaGroup, AgendaResponse, TimelineItem, TimelineResponse, UpcomingResponse, ICalTokenResponse, ICalTokenStatus, CalendarConnector, CalendarConnectorSyncResult, EventParticipant, RecurrenceRule, CalendarEventTemplate, CreateEventTemplateInput, UpdateEventTemplateInput, CalendarConnectorOAuthResult, } from './resources/calendar.js';
 export { BookingResource } from './resources/booking.js';
-export type {
-  EventSlot,
-  Booking,
-  AvailableTime,
-  AvailabilityResponse,
-  CreateSlotInput,
-  UpdateSlotInput,
-  BookingFilters,
-  WaitlistStatus,
-  BookingWaitlistEntry,
-  JoinWaitlistInput,
-  WaitlistFilters,
-  BookingAnalytics,
-  AnalyticsFilters,
-  EventTemplate,
-  CreateTemplateInput,
-  BookingBranding,
-  PaymentStatus,
-} from './resources/booking.js';
+export type { EventSlot, Booking, AvailableTime, AvailabilityResponse, CreateSlotInput, UpdateSlotInput, BookingFilters, WaitlistStatus, BookingWaitlistEntry, JoinWaitlistInput, WaitlistFilters, BookingAnalytics, AnalyticsFilters, EventTemplate, CreateTemplateInput, BookingBranding, PaymentStatus, } from './resources/booking.js';
 export { TeamBookingGroupsResource } from './resources/team-booking-groups.js';
-export type {
-  TeamBookingGroup,
-  TeamBookingGroupMember,
-  CreateBookingGroupInput,
-  UpdateBookingGroupInput,
-  AssignmentMode,
-  AddGroupMemberInput,
-} from './resources/team-booking-groups.js';
+export type { TeamBookingGroup, TeamBookingGroupMember, CreateBookingGroupInput, UpdateBookingGroupInput, AssignmentMode, AddGroupMemberInput, } from './resources/team-booking-groups.js';
 export { CustomDomainsResource } from './resources/custom-domains.js';
 export type { CustomDomain, CustomDomainStatus, CustomDomainSslStatus, DnsCheckResult, DnsCheckResponse } from './resources/custom-domains.js';
 export { AnalyticsResource } from './resources/analytics.js';
@@ -114,94 +43,17 @@ export type { PublishedVault, PublishVaultParams } from './resources/publish-vau
 export { SamlResource } from './resources/saml.js';
 export type { SsoConfig, CreateSsoConfigInput, UpdateSsoConfigInput } from './resources/saml.js';
 export { ScimResource } from './resources/scim.js';
-export type {
-  ScimUser,
-  ScimListResponse,
-  ScimCreateUserInput,
-  ScimUpdateUserInput,
-  ScimServiceProviderConfig,
-} from './resources/scim.js';
+export type { ScimUser, ScimListResponse, ScimCreateUserInput, ScimUpdateUserInput, ScimServiceProviderConfig, } from './resources/scim.js';
 export { PluginsResource } from './resources/plugins.js';
 export type { InstalledPlugin, InstallPluginInput } from './resources/plugins.js';
 export { CollaborationResource } from './resources/collaboration.js';
-
 export { ensureArray } from './utils/ensure-array.js';
-
-// Request signing
-export {
-  signRequest,
-  buildSignaturePayload,
-  signPayload,
-  generateNonce,
-  SIGNATURE_HEADER,
-  SIGNATURE_TIMESTAMP_HEADER,
-  SIGNATURE_NONCE_HEADER,
-  MAX_TIMESTAMP_AGE_MS,
-} from './lib/signature.js';
-
-// Audit logging — types only in the main barrel. The AuditLogger class lives at
-// `@lifestreamdynamics/vault-sdk/audit` because it imports node:fs/path/os and
-// would break React Native / browser bundlers if dragged into the main entry.
+export { signRequest, buildSignaturePayload, signPayload, generateNonce, SIGNATURE_HEADER, SIGNATURE_TIMESTAMP_HEADER, SIGNATURE_NONCE_HEADER, MAX_TIMESTAMP_AGE_MS, } from './lib/signature.js';
 export type { AuditEntry, AuditLoggerOptions } from './lib/audit-logger.js';
-
-// Event emitter
 export { SDKEventEmitter } from './lib/event-emitter.js';
 export type { SDKEventMap, BeforeRequestEvent, AfterResponseEvent, RequestErrorEvent, TokenRefreshEvent, RetryEvent } from './lib/event-emitter.js';
-
-// Encryption
-export {
-  generateVaultKey,
-  encrypt as encryptContent,
-  decrypt as decryptContent,
-  isEncryptedEnvelope,
-  type EncryptedEnvelope,
-} from './lib/encryption.js';
-
-// Token management
-export {
-  TokenManager,
-  decodeJwtPayload,
-  isTokenExpired,
-  type AuthTokens,
-  type JwtPayload,
-  type OnTokenRefresh,
-  type TokenManagerOptions,
-} from './lib/token-manager.js';
-
-// Error classes
-export {
-  SDKError,
-  ValidationError,
-  AuthenticationError,
-  AuthorizationError,
-  NotFoundError,
-  ConflictError,
-  RateLimitError,
-  NetworkError,
-} from './errors.js';
-
-// Types
-export type {
-  PaginatedResponse,
-  ApiErrorResponse,
-  MessageResponse,
-  Vault,
-  Document,
-  DocumentWithContent,
-  DocumentListItem,
-  DocumentGetOptions,
-  DocumentGetResult,
-  DocumentFetched,
-  DocumentNotModified,
-  DocumentListOptions,
-  DocumentListResult,
-  DocumentListFetched,
-  DocumentListNotModified,
-  SyncListKnownState,
-  SyncListChange,
-  SyncListResult,
-  SearchResult,
-  SearchResponse,
-  AiChatSession,
-  AiChatMessage,
-} from './types/index.js';
+export { generateVaultKey, encrypt as encryptContent, decrypt as decryptContent, isEncryptedEnvelope, type EncryptedEnvelope, } from './lib/encryption.js';
+export { TokenManager, decodeJwtPayload, isTokenExpired, type AuthTokens, type JwtPayload, type OnTokenRefresh, type TokenManagerOptions, } from './lib/token-manager.js';
+export { SDKError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ConflictError, RateLimitError, NetworkError, } from './errors.js';
+export type { PaginatedResponse, ApiErrorResponse, MessageResponse, Vault, Document, DocumentWithContent, DocumentListItem, DocumentGetOptions, DocumentGetResult, DocumentFetched, DocumentNotModified, DocumentListOptions, DocumentListResult, DocumentListFetched, DocumentListNotModified, SyncListKnownState, SyncListChange, SyncListResult, SearchResult, SearchResponse, AiChatSession, AiChatMessage, } from './types/index.js';
+//# sourceMappingURL=index.d.ts.map
