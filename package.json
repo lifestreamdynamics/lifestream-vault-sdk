@@ -53,7 +53,6 @@
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
-    "@lifestreamdynamics/vault-shared": "*",
     "ky": "^1.8.1"
   },
   "devDependencies": {

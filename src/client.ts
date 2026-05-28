@@ -1,5 +1,4 @@
 import ky, { type KyInstance, type BeforeRequestHook, type AfterResponseHook, type BeforeErrorHook, type BeforeRetryHook } from 'ky';
-import { RETRYABLE_STATUS_CODES } from '@lifestreamdynamics/vault-shared';
 import { VaultsResource } from './resources/vaults.js';
 import { DocumentsResource } from './resources/documents.js';
 import { SearchResource } from './resources/search.js';
@@ -38,6 +37,14 @@ import { isMfaChallenge } from './types/api.js';
 
 /** Header used to prevent infinite 401 retry loops. */
 const RETRY_HEADER = 'X-Retry-After-Refresh';
+
+/**
+ * HTTP status codes worth retrying. Inlined from the internal
+ * `@lifestreamdynamics/vault-shared` package (which is not published to npm) so
+ * the standalone SDK build has no unpublishable workspace dependency. Keep in
+ * sync with `RETRYABLE_STATUS_CODES` in packages/shared/src/constants.ts.
+ */
+const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504] as const;
 
 /** Default API URL used when `baseUrl` is not provided. */
 export const DEFAULT_API_URL = 'https://vault.lifestreamdynamics.com';
