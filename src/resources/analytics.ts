@@ -74,7 +74,7 @@ export class AnalyticsResource {
    */
   async getShareAnalytics(vaultId: string, shareId: string): Promise<ShareAnalytics> {
     try {
-      return await this.http.get(`vaults/${vaultId}/shares/${shareId}/analytics`).json<ShareAnalytics>();
+      return await this.http.get(`analytics/vaults/${vaultId}/shares/${shareId}`).json<ShareAnalytics>();
     } catch (error) {
       throw await handleError(error, 'Analytics', shareId);
     }

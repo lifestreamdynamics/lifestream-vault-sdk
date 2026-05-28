@@ -72,7 +72,7 @@ describe('AnalyticsResource', () => {
 
       const result = await resource.getShareAnalytics('v1', 'sh1');
 
-      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/shares/sh1/analytics');
+      expect(kyMock.get).toHaveBeenCalledWith('analytics/vaults/v1/shares/sh1');
       expect(result.shareId).toBe('sh1');
       expect(result.viewCount).toBe(42);
       expect(result.viewsByDay).toHaveLength(2);
