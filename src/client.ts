@@ -39,10 +39,10 @@ import { isMfaChallenge } from './types/api.js';
 const RETRY_HEADER = 'X-Retry-After-Refresh';
 
 /**
- * HTTP status codes worth retrying. Inlined from the internal
- * `@lifestreamdynamics/vault-shared` package (which is not published to npm) so
- * the standalone SDK build has no unpublishable workspace dependency. Keep in
- * sync with `RETRYABLE_STATUS_CODES` in packages/shared/src/constants.ts.
+ * HTTP status codes worth retrying. Inlined from the internal vault-shared
+ * package (which is not published to npm) so the standalone SDK build has no
+ * unpublishable workspace dependency. Keep in sync with RETRYABLE_STATUS_CODES
+ * in packages/shared/src/constants.ts.
  */
 const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504] as const;
 
