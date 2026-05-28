@@ -35,7 +35,7 @@ Official TypeScript SDK for the Lifestream Vault API. Build powerful integration
 - **Modern ESM** - ES modules for tree-shaking and optimal bundle size
 - **Built on Ky** - Leverages the modern, lightweight HTTP client
 - **Audit Logging** - Optional client-side request audit logging
-- **Zero Dependencies** - Only requires `ky` for HTTP requests
+- **Single dependency** - Only `ky` for HTTP requests
 
 ## 📦 Installation
 
@@ -298,19 +298,16 @@ Full-text search across your vaults with filtering.
 ```typescript
 // Search all vaults
 const results = await client.search.search({
-  query: 'typescript',
-  vaultIds: ['vault-1', 'vault-2'], // Optional: filter by vaults
-  tags: ['code', 'tutorial'], // Optional: filter by tags
+  q: 'typescript',
+  vault: 'vault-1', // Optional: filter by a single vault ID
+  tags: 'code,tutorial', // Optional: comma-separated tag filter
   limit: 20,
   offset: 0,
 });
 
 for (const result of results.results) {
-  console.log(result.title, result.highlight);
+  console.log(result.title, result.snippet);
 }
-
-// Get autocomplete suggestions
-const suggestions = await client.search.autocomplete('type');
 ```
 
 ### AI
@@ -320,17 +317,18 @@ AI-powered document chat and summarization.
 ```typescript
 // Create a chat session
 const session = await client.ai.createSession({
-  vaultId: 'vault-id',
-  documentPaths: ['doc1.md', 'doc2.md'], // Optional: specific docs
-  systemPrompt: 'You are a helpful assistant.', // Optional
+  title: 'Project Q&A', // Optional
+  vaultId: 'vault-id', // Optional
 });
 
-// Send a message
-const response = await client.ai.sendMessage(session.id, {
+// Send a message (omit sessionId to start a new conversation)
+const response = await client.ai.chat({
   message: 'Summarize the key points from these documents',
+  sessionId: session.id, // Optional
+  vaultId: 'vault-id', // Optional
 });
 
-console.log(response.message); // AI response
+console.log(response.message.content); // AI response
 
 // List all chat sessions
 const sessions = await client.ai.listSessions();
@@ -356,11 +354,8 @@ const team = await client.teams.create({
   description: 'Engineering team workspace',
 });
 
-// Add a member
-await client.teams.addMember(team.id, {
-  email: 'colleague@example.com',
-  role: 'member', // 'admin' or 'member'
-});
+// Invite a member
+await client.teams.inviteMember(team.id, 'colleague@example.com', 'editor'); // 'admin' | 'editor' | 'viewer'
 
 // Create a team vault
 const teamVault = await client.teams.createVault(team.id, {
@@ -382,12 +377,12 @@ const keys = await client.apiKeys.list();
 // Create an API key
 const apiKey = await client.apiKeys.create({
   name: 'CI/CD Key',
-  scopes: ['vaults:read', 'documents:read'],
+  scopes: ['read', 'write'],
   vaultId: 'vault-id', // Optional: scope to specific vault
   expiresAt: '2026-12-31T23:59:59Z', // Optional
 });
 
-console.log(apiKey.secret); // Only shown once! Save it securely
+console.log(apiKey.key); // Only shown once! Save it securely
 
 // Delete an API key
 await client.apiKeys.delete('key-id');
@@ -399,8 +394,16 @@ Manage user profile and storage information.
 
 ```typescript
 // Get current user profile
-const user = await client.user.get();
-console.log(user.email, user.name);
+const user = await client.user.me();
+console.log(user.email, user.displayName);
+
+// Update profile
+await client.user.updateProfile({
+  displayName: 'Jane Doe',
+  profileSlug: 'jane',
+  profileBio: 'Notes and ideas',
+  profileIsPublic: true,
+});
 
 // Get storage usage
 const storage = await client.user.getStorage();
@@ -417,21 +420,18 @@ const subscription = await client.subscription.get();
 console.log(subscription.tier); // 'free', 'pro', or 'business'
 
 // Get available plans
-const plans = await client.subscription.getPlans();
+const plans = await client.subscription.listPlans();
 
 // Create a checkout session for upgrading
-const checkout = await client.subscription.createCheckout({
-  planId: 'pro-monthly',
-  successUrl: 'https://example.com/success',
-  cancelUrl: 'https://example.com/cancel',
-});
+const checkout = await client.subscription.createCheckoutSession(
+  'pro',
+  'https://example.com/return',
+);
 
 // Open checkout.url in browser for payment
 
 // Create a billing portal session
-const portal = await client.subscription.createPortalSession({
-  returnUrl: 'https://example.com/settings',
-});
+const portal = await client.subscription.createPortalSession('https://example.com/settings');
 ```
 
 ### Shares
@@ -440,20 +440,18 @@ Create temporary share links for documents.
 
 ```typescript
 // Create a share link
-const share = await client.shares.create({
-  vaultId: 'vault-id',
-  documentPath: 'path/to/doc.md',
+const share = await client.shares.create('vault-id', 'path/to/doc.md', {
   expiresAt: '2026-03-01T00:00:00Z', // Optional
   password: 'secret123', // Optional
 });
 
-console.log(share.shareUrl); // Share this URL
+console.log(share.fullToken); // Only returned at creation — save it
 
-// List all shares
-const shares = await client.shares.list();
+// List shares for a document
+const shares = await client.shares.list('vault-id', 'path/to/doc.md');
 
 // Revoke a share
-await client.shares.delete('share-token');
+await client.shares.revoke('vault-id', 'share-id');
 ```
 
 ### Publish
@@ -462,19 +460,17 @@ Publish documents for public access.
 
 ```typescript
 // Publish a document
-const published = await client.publish.publish({
-  vaultId: 'vault-id',
-  documentPath: 'blog/post.md',
-  slug: 'my-blog-post', // Optional: auto-generated
+const published = await client.publish.create('vault-id', 'blog/post.md', {
+  slug: 'my-blog-post',
 });
 
-console.log(published.publicUrl); // Public URL
+console.log(published.slug); // Published at /{slug}
 
-// List published documents
-const docs = await client.publish.list();
+// List published documents in a vault
+const docs = await client.publish.listMine('vault-id');
 
 // Unpublish
-await client.publish.unpublish('vault-id', 'blog/post.md');
+await client.publish.delete('vault-id', 'blog/post.md');
 ```
 
 ### Connectors
@@ -497,14 +493,14 @@ const connector = await client.connectors.create({
 });
 
 // Test connection
-const testResult = await client.connectors.testConnection(connector.id);
+const testResult = await client.connectors.test(connector.id);
 console.log(testResult.success);
 
 // Trigger manual sync
-await client.connectors.triggerSync(connector.id);
+await client.connectors.sync(connector.id);
 
 // View sync logs
-const logs = await client.connectors.getSyncLogs(connector.id);
+const logs = await client.connectors.logs(connector.id);
 ```
 
 ### Hooks
@@ -518,16 +514,15 @@ const hooks = await client.hooks.list('vault-id');
 // Create a hook
 const hook = await client.hooks.create('vault-id', {
   name: 'Auto-tag documents',
-  eventType: 'document.created',
-  handlerType: 'auto_tag',
-  config: {
+  triggerEvent: 'document.created',
+  actionType: 'auto-tag',
+  actionConfig: {
     tags: ['inbox'],
   },
-  enabled: true,
 });
 
 // View hook executions
-const executions = await client.hooks.getExecutions('vault-id', hook.id);
+const executions = await client.hooks.listExecutions('vault-id', hook.id);
 ```
 
 ### Webhooks
@@ -542,13 +537,12 @@ const webhooks = await client.webhooks.list('vault-id');
 const webhook = await client.webhooks.create('vault-id', {
   url: 'https://example.com/webhook',
   events: ['document.created', 'document.updated'],
-  enabled: true,
 });
 
 console.log(webhook.secret); // Use for HMAC verification
 
 // View delivery logs
-const deliveries = await client.webhooks.getDeliveries('vault-id', webhook.id);
+const deliveries = await client.webhooks.listDeliveries('vault-id', webhook.id);
 ```
 
 ### Admin
@@ -581,13 +575,13 @@ console.log(health.status); // 'healthy', 'degraded', or 'down'
 
 ```typescript
 // Get aggregated calendar view (free tier)
-const calendar = await client.calendar.getCalendar(vaultId, { month: 2, year: 2026 });
+const calendar = await client.calendar.getCalendar(vaultId, { start: '2026-02-01', end: '2026-02-28' });
 
-// Get activity heatmap for past year (free tier)
-const activity = await client.calendar.getActivity(vaultId);
+// Get activity heatmap (free tier)
+const activity = await client.calendar.getActivity(vaultId, { start: '2025-02-01', end: '2026-02-01' });
 
 // Get documents by due date (pro tier)
-const due = await client.calendar.getDue(vaultId, { from: '2026-02-01', to: '2026-02-28' });
+const due = await client.calendar.getDueDates(vaultId, { status: 'upcoming' });
 
 // Get agenda view (pro tier)
 const agenda = await client.calendar.getAgenda(vaultId, { groupBy: 'week' });
@@ -595,8 +589,8 @@ const agenda = await client.calendar.getAgenda(vaultId, { groupBy: 'week' });
 // Create a calendar event (pro tier)
 const event = await client.calendar.createEvent(vaultId, {
   title: 'Team Review',
-  startAt: '2026-02-20T10:00:00Z',
-  endAt: '2026-02-20T11:00:00Z',
+  startDate: '2026-02-20T10:00:00Z',
+  endDate: '2026-02-20T11:00:00Z',
 });
 
 // List calendar events (pro tier)
@@ -621,15 +615,17 @@ const setup = await client.mfa.setupTotp();
 // Verify and enable TOTP
 await client.mfa.verifyTotp('123456');
 
-// Register a passkey
-const registration = await client.mfa.startPasskeyRegistration();
-await client.mfa.finishPasskeyRegistration(registration.options);
-
 // List passkeys
 const passkeys = await client.mfa.listPasskeys();
 
-// Regenerate backup codes
-const codes = await client.mfa.regenerateBackupCodes();
+// Rename a passkey
+await client.mfa.renamePasskey('passkey-id', 'My YubiKey');
+
+// Delete a passkey
+await client.mfa.deletePasskey('passkey-id');
+
+// Regenerate backup codes (requires password)
+const codes = await client.mfa.regenerateBackupCodes('your-password');
 ```
 
 ### Analytics
@@ -883,8 +879,10 @@ await client.teamBookingGroups.deleteGroup('team-id', group.id);
 | `refreshBufferMs` | `number` | `60000` | Milliseconds before expiry to trigger proactive refresh |
 | `onTokenRefresh` | `function` | - | Callback when tokens are refreshed |
 | `enableRequestSigning` | `boolean` | `true` (API keys) | Enable HMAC request signing |
-| `enableAuditLogging` | `boolean` | `false` | Enable client-side audit logging |
-| `auditLogPath` | `string` | `~/.lsvault/audit.log` | Path to audit log file |
+| `events` | `SDKEventEmitter` | - | Event emitter for SDK lifecycle events (`beforeRequest`, `afterResponse`, `error`, `tokenRefresh`) |
+| `beforeRequest` | `Array<(request) => void \| Promise<void>>` | - | Custom hooks run before each request |
+| `afterResponse` | `Array<(request, response) => void \| Promise<void>>` | - | Custom hooks run after each response |
+| `retry` | `object` | enabled by default | Retry configuration (`limit`, `statusCodes`, `methods`, `backoffLimit`, `delay`) passed through to ky |
 
 ### Full Configuration Example
 
@@ -894,8 +892,6 @@ const client = new LifestreamVaultClient({
   apiKey: 'lsv_k_your_api_key',
   timeout: 60000, // 60 seconds
   enableRequestSigning: true,
-  enableAuditLogging: true,
-  auditLogPath: '/var/log/lsvault-audit.log',
 });
 ```
 
@@ -952,9 +948,9 @@ console.log('Vault created and documents uploaded successfully!');
 ```typescript
 // Search for documents with specific tags
 const results = await client.search.search({
-  query: 'API',
-  tags: ['documentation', 'tutorial'],
-  vaultIds: [vault.id],
+  q: 'API',
+  tags: 'documentation,tutorial',
+  vault: vault.id,
 });
 
 // Export matching documents
@@ -970,25 +966,27 @@ for (const result of results.results) {
 ### AI-Powered Document Q&A
 
 ```typescript
-// Create an AI session with specific documents
+// Create an AI session scoped to a vault
 const session = await client.ai.createSession({
+  title: 'Docs Q&A',
   vaultId: vault.id,
-  documentPaths: ['api/reference.md', 'setup/installation.md'],
-  systemPrompt: 'You are a technical documentation assistant.',
 });
 
 // Ask questions about the documents
-const response1 = await client.ai.sendMessage(session.id, {
+const response1 = await client.ai.chat({
   message: 'What are the authentication methods supported?',
+  sessionId: session.id,
+  vaultId: vault.id,
 });
 
-console.log('AI:', response1.message);
+console.log('AI:', response1.message.content);
 
-const response2 = await client.ai.sendMessage(session.id, {
+const response2 = await client.ai.chat({
   message: 'How do I install the SDK?',
+  sessionId: response1.sessionId,
 });
 
-console.log('AI:', response2.message);
+console.log('AI:', response2.message.content);
 ```
 
 ### Automated Backup Script
@@ -1039,16 +1037,16 @@ const team = await client.teams.create({
   description: 'Marketing team collaboration space',
 });
 
-// Add team members
+// Invite team members
 const members = [
-  { email: 'alice@example.com', role: 'admin' },
-  { email: 'bob@example.com', role: 'member' },
-  { email: 'carol@example.com', role: 'member' },
+  { email: 'alice@example.com', role: 'admin' as const },
+  { email: 'bob@example.com', role: 'editor' as const },
+  { email: 'carol@example.com', role: 'viewer' as const },
 ];
 
 for (const member of members) {
-  await client.teams.addMember(team.id, member);
-  console.log(`Added ${member.email} as ${member.role}`);
+  await client.teams.inviteMember(team.id, member.email, member.role);
+  console.log(`Invited ${member.email} as ${member.role}`);
 }
 
 // Create a shared vault for the team
@@ -1239,29 +1237,33 @@ The HMAC signature is computed using your full API key as the secret, and three 
 ```typescript
 import { signRequest } from '@lifestreamdynamics/vault-sdk';
 
-const headers = signRequest(
+// signRequest is async — await it
+const headers = await signRequest(
   'lsv_k_your_api_key',
   'POST',
   '/api/v1/vaults',
   JSON.stringify({ name: 'My Vault' }),
 );
 
-console.log(headers['x-signature']); // HMAC signature
-console.log(headers['x-signature-timestamp']); // ISO timestamp
-console.log(headers['x-signature-nonce']); // Random nonce
+console.log(headers['X-Signature']); // HMAC signature
+console.log(headers['X-Signature-Timestamp']); // ISO timestamp
+console.log(headers['X-Signature-Nonce']); // Random nonce
 ```
 
 ### Audit Logging
 
-Enable client-side request logging for compliance and debugging.
+Enable client-side request logging for compliance and debugging. Audit logging is not a `ClientOptions` flag — install it on an existing client via `installAuditLogging`, imported from the `/audit` subpath export (it depends on Node `fs`, so it is kept out of the main barrel for browser builds).
 
 ```typescript
+import { LifestreamVaultClient } from '@lifestreamdynamics/vault-sdk';
+import { installAuditLogging } from '@lifestreamdynamics/vault-sdk/audit';
+
 const client = new LifestreamVaultClient({
   baseUrl: 'https://vault.lifestreamdynamics.com',
   apiKey: 'lsv_k_your_api_key',
-  enableAuditLogging: true,
-  auditLogPath: '/var/log/lsvault/audit.log',
 });
+
+installAuditLogging(client, { logPath: '/var/log/lsvault/audit.log' });
 
 // All requests are now logged to the audit file
 await client.vaults.list();
@@ -1273,7 +1275,7 @@ await client.vaults.list();
 **Standalone Audit Logger:**
 
 ```typescript
-import { AuditLogger } from '@lifestreamdynamics/vault-sdk';
+import { AuditLogger } from '@lifestreamdynamics/vault-sdk/audit';
 
 const logger = new AuditLogger({ logPath: './custom-audit.log' });
 
@@ -1324,9 +1326,9 @@ import { decodeJwtPayload, isTokenExpired } from '@lifestreamdynamics/vault-sdk'
 
 const token = 'eyJhbGci...';
 
-// Decode JWT payload without verification
+// Decode JWT payload without verification (returns JwtPayload | null)
 const payload = decodeJwtPayload(token);
-console.log(payload.userId, payload.email);
+console.log(payload?.sub, payload?.email);
 
 // Check if token is expired
 if (isTokenExpired(token)) {
