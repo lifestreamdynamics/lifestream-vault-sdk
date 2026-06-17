@@ -1,6 +1,7 @@
 import ky, { type KyInstance, type BeforeRequestHook, type AfterResponseHook, type BeforeErrorHook, type BeforeRetryHook } from 'ky';
 import { VaultsResource } from './resources/vaults.js';
 import { DocumentsResource } from './resources/documents.js';
+import { EventsResource } from './resources/events.js';
 import { SearchResource } from './resources/search.js';
 import { AiResource } from './resources/ai.js';
 import { TeamsResource } from './resources/teams.js';
@@ -175,6 +176,8 @@ export class LifestreamVaultClient {
   readonly vaults: VaultsResource;
   /** Document CRUD and file operations. */
   readonly documents: DocumentsResource;
+  /** Incremental vault change feed (`vault_events`). Distinct from {@link events}, which is the SDK lifecycle emitter. */
+  readonly vaultEvents: EventsResource;
   /** Full-text search across vaults. */
   readonly search: SearchResource;
   /** AI chat and document summarization. */
@@ -478,6 +481,7 @@ export class LifestreamVaultClient {
 
     this.vaults = new VaultsResource(this.http);
     this.documents = new DocumentsResource(this.http);
+    this.vaultEvents = new EventsResource(this.http);
     this.search = new SearchResource(this.http);
     this.ai = new AiResource(this.http);
     this.apiKeys = new ApiKeysResource(this.http);

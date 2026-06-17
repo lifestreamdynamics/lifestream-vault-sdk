@@ -2,7 +2,9 @@ export { LifestreamVaultClient, DEFAULT_API_URL, type ClientOptions } from './cl
 export { VaultsResource } from './resources/vaults.js';
 export type { VaultTreeNode, VaultExportRecord, VaultMfaConfig, LinkGraphNode, LinkGraphEdge, LinkGraphResponse, UnresolvedLink, UnresolvedLinkReference } from './resources/vaults.js';
 export { DocumentsResource } from './resources/documents.js';
-export type { BulkOperationResult, DocumentVersion, DocumentVersionWithContent, VersionDiffResponse, ForwardLinkResult, BacklinkResult } from './resources/documents.js';
+export type { BulkOperationResult, BulkGetItem, BulkGetResult, DocumentVersion, DocumentVersionWithContent, VersionDiffResponse, ForwardLinkResult, BacklinkResult } from './resources/documents.js';
+export { EventsResource } from './resources/events.js';
+export type { VaultEvent, EventsListOptions, EventsListResult } from './resources/events.js';
 export { SearchResource } from './resources/search.js';
 export { AiResource } from './resources/ai.js';
 export type { SimilarDocument, AiStreamChunk, AiStreamResult } from './resources/ai.js';

@@ -42,6 +42,37 @@ describe('DocumentsResource', () => {
       expect(result).toEqual([]);
     });
 
+    it('should pass the since filter as a query param', async () => {
+      mockJsonResponse(kyMock.get, { documents: [] });
+
+      await resource.list('v1', undefined, { since: '2026-06-17T00:00:00.000Z' });
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', {
+        searchParams: { since: '2026-06-17T00:00:00.000Z' },
+      });
+    });
+
+    it('should combine since with dir, tags, limit, and offset', async () => {
+      mockJsonResponse(kyMock.get, { documents: [] });
+
+      await resource.list('v1', 'notes/', {
+        since: '2026-06-17T00:00:00.000Z',
+        tags: ['work'],
+        limit: 50,
+        offset: 10,
+      });
+
+      expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', {
+        searchParams: {
+          dir: 'notes/',
+          tags: 'work',
+          limit: 50,
+          offset: 10,
+          since: '2026-06-17T00:00:00.000Z',
+        },
+      });
+    });
+
     describe('conditional list (ifNoneMatch)', () => {
       const remoteDocs = [
         {
@@ -871,6 +902,38 @@ describe('DocumentsResource', () => {
       expect(kyMock.get).toHaveBeenCalledWith('vaults/v1/documents', expect.objectContaining({
         searchParams: expect.objectContaining({ dir: 'notes/', tags: 'foo' }),
       }));
+    });
+  });
+
+  describe('bulkGet', () => {
+    it('POSTs the paths and returns results + failed', async () => {
+      const payload = {
+        results: [
+          { path: 'notes/a.md', contentHash: 'hash-a', content: '# A' },
+          { path: 'notes/b.md', contentHash: 'hash-b', content: '# B' },
+        ],
+        failed: [{ path: 'notes/missing.md', error: 'Document not found' }],
+      };
+      mockJsonResponse(kyMock.post, payload);
+
+      const result = await resource.bulkGet('v1', ['notes/a.md', 'notes/b.md', 'notes/missing.md']);
+
+      expect(kyMock.post).toHaveBeenCalledWith('vaults/v1/documents/bulk-get', {
+        json: { paths: ['notes/a.md', 'notes/b.md', 'notes/missing.md'] },
+      });
+      expect(result).toEqual(payload);
+    });
+
+    it('surfaces a 400 as a ValidationError', async () => {
+      mockHTTPError(kyMock.post, 400, { message: 'At least one path is required' });
+
+      await expect(resource.bulkGet('v1', [])).rejects.toThrow();
+    });
+
+    it('maps network failures to a NetworkError', async () => {
+      mockNetworkError(kyMock.post);
+
+      await expect(resource.bulkGet('v1', ['notes/a.md'])).rejects.toBeInstanceOf(NetworkError);
     });
   });
 });

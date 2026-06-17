@@ -71,6 +71,14 @@ export interface DocumentListOptions {
   /** Filter to documents that carry all of the specified tags. */
   tags?: string[];
   /**
+   * Incremental sync filter. When set to an ISO-8601 timestamp, the server
+   * returns only documents whose `updatedAt` is strictly greater than this
+   * value — letting a sync client fetch just what changed since its last poll
+   * instead of the full document set. Combine with the persisted `updatedAt`
+   * of the newest document seen on the previous call.
+   */
+  since?: string;
+  /**
    * Conditional LIST. Supply the `etag` returned by a previous conditional
    * list call. When the server answers 304 Not Modified the SDK returns
    * `{ notModified: true }` without a document body. Pass an empty string
@@ -251,6 +259,28 @@ export interface BulkOperationResult {
   failed: Array<{ path: string; error: string }>;
 }
 
+/** A single document body returned by {@link DocumentsResource.bulkGet}. */
+export interface BulkGetItem {
+  /** File path relative to the vault root, echoing the requested path. */
+  path: string;
+  /** SHA-256 hex digest of the document content. */
+  contentHash: string;
+  /** Raw Markdown content of the document. */
+  content: string;
+}
+
+/**
+ * Result of {@link DocumentsResource.bulkGet}: the fetched document bodies plus
+ * a per-path failure list. A missing or unreadable path does NOT fail the whole
+ * request — it is reported in `failed` so the caller can reconcile partial sets.
+ */
+export interface BulkGetResult {
+  /** Successfully fetched documents, in arbitrary order. */
+  results: BulkGetItem[];
+  /** Paths that could not be fetched, with the reason. */
+  failed: Array<{ path: string; error: string }>;
+}
+
 /**
  * Resource for managing documents within vaults.
  *
@@ -315,6 +345,7 @@ export class DocumentsResource {
     if (options?.limit !== undefined) searchParams.limit = options.limit;
     if (options?.offset !== undefined) searchParams.offset = options.offset;
     if (options?.tags && options.tags.length > 0) searchParams.tags = options.tags.join(',');
+    if (options?.since !== undefined) searchParams.since = options.since;
 
     // Unconditional path — backward-compatible, returns array directly.
     if (options?.ifNoneMatch === undefined) {
@@ -522,6 +553,39 @@ export class DocumentsResource {
       // If we already threw a typed SDK error above, surface it as-is.
       if (error instanceof SDKError) throw error;
       throw await handleError(error, 'Document', docPath);
+    }
+  }
+
+  /**
+   * Fetches multiple document bodies in a single request.
+   *
+   * Use this when a sync client genuinely needs fresh content for a known set
+   * of paths — it replaces N per-document GET round trips with one. Missing or
+   * unreadable paths are reported in `failed` rather than throwing, so a single
+   * bad path does not abort the batch. At most 500 paths per call.
+   *
+   * @param vaultId - The vault to read from
+   * @param paths - File paths relative to vault root (1–500)
+   * @returns The fetched document bodies plus a per-path failure list
+   * @throws {ValidationError} If `paths` is empty or exceeds 500 entries
+   * @throws {AuthenticationError} If the request is not authenticated
+   *
+   * @example
+   * ```typescript
+   * const { results, failed } = await client.documents.bulkGet('vault-uuid', [
+   *   'notes/a.md',
+   *   'notes/b.md',
+   * ]);
+   * for (const doc of results) console.log(doc.path, doc.contentHash);
+   * ```
+   */
+  async bulkGet(vaultId: string, paths: string[]): Promise<BulkGetResult> {
+    try {
+      return await this.http
+        .post(`vaults/${vaultId}/documents/bulk-get`, { json: { paths } })
+        .json<BulkGetResult>();
+    } catch (error) {
+      throw await handleError(error, 'Documents', vaultId);
     }
   }
 
